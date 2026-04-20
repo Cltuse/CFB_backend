@@ -115,6 +115,21 @@ public class UserController {
         }
     }
 
+    @GetMapping("/reportable-list")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MAINTAINER')")
+    public Result<List<User>> getReportableUsers() {
+        try {
+            List<User> users = userRepository.findAll(Sort.by(Sort.Direction.ASC, "realName"))
+                    .stream()
+                    .filter(user -> !"ADMIN".equals(user.getRole()) && !"MAINTAINER".equals(user.getRole()))
+                    .map(this::toReportableUser)
+                    .toList();
+            return Result.success(users);
+        } catch (Exception e) {
+            return Result.error("获取可上报用户列表失败: " + e.getMessage());
+        }
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public Result<User> getById(@PathVariable Long id) {
@@ -271,6 +286,16 @@ public class UserController {
         safeUser.setViolationCount(violationRecordService.getUserViolationCount(user.getId()));
         safeUser.setPassword("******");
         return safeUser;
+    }
+
+    private User toReportableUser(User user) {
+        User reportableUser = new User();
+        reportableUser.setId(user.getId());
+        reportableUser.setUsername(user.getUsername());
+        reportableUser.setRealName(user.getRealName());
+        reportableUser.setRole(user.getRole());
+        reportableUser.setStatus(user.getStatus());
+        return reportableUser;
     }
 
     private boolean canAccessUser(Long userId) {
