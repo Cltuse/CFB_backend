@@ -185,6 +185,20 @@ public class AdminController {
      * @param blacklistData 黑名单信息
      * @return 操作结果
      */
+    @GetMapping("/blacklist/stats")
+    public Result<Map<String, Object>> getBlacklistStats() {
+        try {
+            Map<String, Object> stats = new HashMap<>();
+            stats.put("activeCount", blacklistRepository.countByStatus("ACTIVE"));
+            stats.put("expiredCount", blacklistRepository.countByStatus("EXPIRED"));
+            stats.put("removedCount", blacklistRepository.countByStatus("REMOVED"));
+            stats.put("totalCount", blacklistRepository.count());
+            return Result.success(stats);
+        } catch (Exception e) {
+            return Result.error("获取黑名单统计数据失败: " + e.getMessage());
+        }
+    }
+
     @PostMapping("/blacklist")
     @OperationLog(operationType = "ADD_BLACKLIST", detail = "将用户加入黑名单")
     public Result<Blacklist> addToBlacklist(@RequestBody Map<String, Object> blacklistData) {
