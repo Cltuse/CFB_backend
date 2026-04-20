@@ -1,0 +1,38 @@
+SELECT
+    TABLE_SCHEMA,
+    TABLE_NAME,
+    TABLE_COLLATION
+FROM information_schema.TABLES
+WHERE TABLE_SCHEMA = DATABASE()
+ORDER BY TABLE_NAME;
+
+SELECT
+    TABLE_SCHEMA,
+    TABLE_NAME,
+    COLUMN_NAME,
+    CHARACTER_SET_NAME,
+    COLLATION_NAME,
+    DATA_TYPE
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE()
+  AND CHARACTER_SET_NAME IS NOT NULL
+ORDER BY TABLE_NAME, ORDINAL_POSITION;
+
+SELECT
+    DEFAULT_CHARACTER_SET_NAME,
+    DEFAULT_COLLATION_NAME
+FROM information_schema.SCHEMATA
+WHERE SCHEMA_NAME = DATABASE();
+
+-- 修复建议示例：
+-- ALTER DATABASE campus_facility_booking CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+-- ALTER TABLE operation_log CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+-- ALTER TABLE user CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+-- ALTER TABLE notice CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- 历史乱码数据修复示例：
+-- 将维护人员完成维护时写入的乱码 detail 统一修正
+-- UPDATE operation_log
+-- SET detail = '完成维护'
+-- WHERE operation_type = 'COMPLETE_MAINTENANCE'
+--   AND (detail LIKE '%???%' OR detail REGEXP '[^ -~一-龥]');
