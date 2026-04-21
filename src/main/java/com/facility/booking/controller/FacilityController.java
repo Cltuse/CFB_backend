@@ -137,6 +137,13 @@ public class FacilityController {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime endDate = now.plusDays(days);
         List<Reservation> reservations = reservationRepository.findByFacilityId(id);
+        Map<Long, User> usersById = userRepository.findAllById(
+                        reservations.stream()
+                                .map(Reservation::getUserId)
+                                .filter(Objects::nonNull)
+                                .collect(Collectors.toSet()))
+                .stream()
+                .collect(Collectors.toMap(User::getId, user -> user));
         List<Map<String, Object>> timeline = new ArrayList<>();
 
         for (Reservation reservation : reservations) {
@@ -153,7 +160,8 @@ public class FacilityController {
             reservationInfo.put("endTime", reservation.getEndTime());
             reservationInfo.put("status", reservation.getStatus());
             reservationInfo.put("purpose", reservation.getPurpose());
-            reservationInfo.put("userName", reservation.getUserName());
+            User user = usersById.get(reservation.getUserId());
+            reservationInfo.put("userName", user != null ? getDisplayName(user) : "未知用户");
             timeline.add(reservationInfo);
         }
 
