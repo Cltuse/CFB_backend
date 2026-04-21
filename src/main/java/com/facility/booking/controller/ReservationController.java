@@ -72,7 +72,7 @@ public class ReservationController {
      */
     @GetMapping("/user/{userId}")
     public Result<List<Reservation>> getByUserId(@PathVariable Long userId) {
-        List<Reservation> reservations = reservationRepository.findByUserId(userId);
+        List<Reservation> reservations = filterReservationsForCurrentMaintainer(reservationRepository.findByUserId(userId));
         enrichReservations(reservations);
         return Result.success(reservations);
     }

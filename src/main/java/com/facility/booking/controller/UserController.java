@@ -8,7 +8,11 @@ import com.facility.booking.dto.user.ChangePasswordRequest;
 import com.facility.booking.dto.user.CurrentUserProfileUpdateRequest;
 import com.facility.booking.dto.user.LoginRequest;
 import com.facility.booking.dto.user.RegisterRequest;
+import com.facility.booking.entity.Facility;
+import com.facility.booking.entity.Reservation;
 import com.facility.booking.entity.User;
+import com.facility.booking.repository.FacilityRepository;
+import com.facility.booking.repository.ReservationRepository;
 import com.facility.booking.repository.UserRepository;
 import com.facility.booking.security.CurrentUserService;
 import com.facility.booking.security.CustomUserPrincipal;
@@ -33,8 +37,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/user")
@@ -45,19 +53,25 @@ public class UserController {
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
     private final CurrentUserService currentUserService;
+    private final FacilityRepository facilityRepository;
+    private final ReservationRepository reservationRepository;
 
     public UserController(
             UserRepository userRepository,
             ViolationRecordService violationRecordService,
             JwtTokenProvider jwtTokenProvider,
             PasswordEncoder passwordEncoder,
-            CurrentUserService currentUserService
+            CurrentUserService currentUserService,
+            FacilityRepository facilityRepository,
+            ReservationRepository reservationRepository
     ) {
         this.userRepository = userRepository;
         this.violationRecordService = violationRecordService;
         this.jwtTokenProvider = jwtTokenProvider;
         this.passwordEncoder = passwordEncoder;
         this.currentUserService = currentUserService;
+        this.facilityRepository = facilityRepository;
+        this.reservationRepository = reservationRepository;
     }
 
     @PostMapping("/login")
@@ -105,9 +119,14 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN')")
     public Result<Page<User>> list(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "10") int size
+    ) {
         try {
-            PageRequest pageRequest = PageRequest.of(Math.max(page, 0), PageUtils.normalizeSize(size), Sort.by(Sort.Direction.DESC, "id"));
+            PageRequest pageRequest = PageRequest.of(
+                    Math.max(page, 0),
+                    PageUtils.normalizeSize(size),
+                    Sort.by(Sort.Direction.DESC, "id")
+            );
             Page<User> users = userRepository.findAll(pageRequest);
             return Result.success(users.map(this::toSafeUser));
         } catch (Exception e) {
@@ -119,11 +138,16 @@ public class UserController {
     @PreAuthorize("hasAnyRole('ADMIN', 'MAINTAINER')")
     public Result<List<User>> getReportableUsers() {
         try {
-            List<User> users = userRepository.findAll(Sort.by(Sort.Direction.ASC, "realName"))
-                    .stream()
-                    .filter(user -> !"ADMIN".equals(user.getRole()) && !"MAINTAINER".equals(user.getRole()))
-                    .map(this::toReportableUser)
-                    .toList();
+            List<User> users;
+            if (currentUserService.hasRole("MAINTAINER")) {
+                users = getMaintainerReportableUsers(currentUserService.getCurrentUserId());
+            } else {
+                users = userRepository.findAll(Sort.by(Sort.Direction.ASC, "realName"))
+                        .stream()
+                        .filter(this::isReportableRole)
+                        .map(this::toReportableUser)
+                        .toList();
+            }
             return Result.success(users);
         } catch (Exception e) {
             return Result.error("获取可上报用户列表失败: " + e.getMessage());
@@ -277,6 +301,48 @@ public class UserController {
                 .map(this::toSafeUser)
                 .toList();
         return Result.success(maintainers);
+    }
+
+    private List<User> getMaintainerReportableUsers(Long maintainerId) {
+        if (maintainerId == null) {
+            return List.of();
+        }
+
+        List<Long> facilityIds = facilityRepository.findByMaintainerId(maintainerId)
+                .stream()
+                .map(Facility::getId)
+                .filter(Objects::nonNull)
+                .toList();
+        if (facilityIds.isEmpty()) {
+            return List.of();
+        }
+
+        Set<Long> userIds = reservationRepository.findByFacilityIdIn(facilityIds)
+                .stream()
+                .map(Reservation::getUserId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (userIds.isEmpty()) {
+            return List.of();
+        }
+
+        return userRepository.findAllById(userIds)
+                .stream()
+                .filter(this::isReportableRole)
+                .sorted(Comparator.comparing(this::resolveUserDisplayName, String.CASE_INSENSITIVE_ORDER))
+                .map(this::toReportableUser)
+                .toList();
+    }
+
+    private boolean isReportableRole(User user) {
+        return !"ADMIN".equals(user.getRole()) && !"MAINTAINER".equals(user.getRole());
+    }
+
+    private String resolveUserDisplayName(User user) {
+        if (user.getRealName() != null && !user.getRealName().isBlank()) {
+            return user.getRealName();
+        }
+        return user.getUsername() == null ? "" : user.getUsername();
     }
 
     private User toSafeUser(User user) {

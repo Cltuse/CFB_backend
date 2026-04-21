@@ -29,6 +29,8 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
 
     List<Reservation> findByFacilityId(Long facilityId);
 
+    List<Reservation> findByFacilityIdIn(List<Long> facilityIds);
+
     List<Reservation> findByStatus(String status);
 
     long countByStatus(String status);
