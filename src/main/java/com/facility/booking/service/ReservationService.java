@@ -69,7 +69,7 @@ public class ReservationService {
         }
 
         if (blacklistRepository.findByUserIdAndStatus(reservation.getUserId(), "ACTIVE").isPresent()) {
-            return "该用户已被列入黑名单，无法预约";
+            return "您当前已被限制预约，如有疑问请联系管理员";
         }
 
         if (!reservation.getEndTime().isAfter(reservation.getStartTime())) {
@@ -77,12 +77,12 @@ public class ReservationService {
         }
 
         if (reservation.getStartTime().isBefore(LocalDateTime.now())) {
-            return "不能预约过去的时间";
+            return "开始时间不能早于当前时间，请重新选择";
         }
 
         long durationHours = java.time.Duration.between(reservation.getStartTime(), reservation.getEndTime()).toHours();
         if (durationHours > 24) {
-            return "单次预约时长不能超过24小时";
+            return "单次预约时长不能超过24小时，请调整预约时段";
         }
 
         return validateReservationRules(reservation, facilityOpt.get());
@@ -137,17 +137,17 @@ public class ReservationService {
                 .anyMatch(existing -> excludeReservationId == null || !existing.getId().equals(excludeReservationId));
 
         if (hasConflict) {
-            throw new IllegalStateException("该时间段已被预约，请选择其他时间");
+            throw new IllegalStateException("当前时段已被其他预约占用，请重新选择时间");
         }
     }
 
     public String validateCheckin(Reservation reservation, Long userId) {
         if (!reservation.getUserId().equals(userId)) {
-            return "只有预约用户本人才能进行签到操作";
+            return "仅限预约人本人执行签到";
         }
 
         if (!"APPROVED".equals(reservation.getStatus())) {
-            return "只有已通过的预约才能签到";
+            return "只有审核通过的预约才能签到";
         }
 
         if (!"NOT_CHECKED".equals(reservation.getCheckinStatus())) {
@@ -162,11 +162,11 @@ public class ReservationService {
 
         LocalDateTime now = LocalDateTime.now();
         if (now.isBefore(reservation.getStartTime().minusMinutes(15))) {
-            return "还未到签到时间，可提前15分钟签到";
+            return "当前还未到可签到时间，最多可提前15分钟签到";
         }
 
         if (now.isAfter(reservation.getEndTime())) {
-            return "预约时间已结束，无法签到";
+            return "当前预约时段已结束，无法签到";
         }
 
         return null;
@@ -174,15 +174,15 @@ public class ReservationService {
 
     public String validateCheckout(Reservation reservation, Long userId) {
         if (!reservation.getUserId().equals(userId)) {
-            return "只有预约用户本人才能进行签退操作";
+            return "仅限预约人本人执行签退";
         }
 
         if (!"APPROVED".equals(reservation.getStatus())) {
-            return "只有已通过的预约才能签退";
+            return "只有审核通过的预约才能签退";
         }
 
         if (!"CHECKED_IN".equals(reservation.getCheckinStatus())) {
-            return "请先签到后再签退";
+            return "请先完成签到，再进行签退";
         }
 
         return null;
@@ -241,7 +241,7 @@ public class ReservationService {
                     .count();
 
             if (dailyCount >= ruleConfig.getMaxBookingsPerDay()) {
-                return "您今日预约次数已达上限（" + ruleConfig.getMaxBookingsPerDay() + "次）";
+                return "当前类别设施当日预约次数已达上限（" + ruleConfig.getMaxBookingsPerDay() + "次），无法进行预约";
             }
         }
 
@@ -251,7 +251,7 @@ public class ReservationService {
                     Arrays.asList("PENDING", "APPROVED")
             );
             if (userActiveReservations.size() >= ruleConfig.getMaxActiveBookings()) {
-                return "您的活跃预约数量已达上限（" + ruleConfig.getMaxActiveBookings() + "个）";
+                return "当前类别设施预约数已达上限（" + ruleConfig.getMaxActiveBookings() + "个），无法进行预约";
             }
         }
 

@@ -114,7 +114,7 @@ public class ReservationController {
      * @return 创建的预约记录信息
      */
     @PostMapping
-    @OperationLog(operationType = "CREATE_BOOKING", detail = "Create reservation")
+    @OperationLog(operationType = "CREATE_BOOKING", detail = "创建预约")
     public Result<Reservation> create(@RequestBody Reservation reservation) {
         try {
             String validationError = reservationService.validateReservationCreation(reservation);
@@ -125,9 +125,9 @@ public class ReservationController {
             Reservation savedReservation = reservationService.createReservation(reservation);
             enrichReservation(savedReservation);
 
-            String message = "Reservation created successfully";
+            String message = "预约提交成功";
             if ("PENDING".equals(savedReservation.getStatus())) {
-                message += ", pending admin approval";
+                message = "预约申请已提交，待管理员审核";
             }
 
             return Result.success(message, savedReservation);
@@ -135,7 +135,7 @@ public class ReservationController {
             return Result.error(e.getMessage());
         } catch (Exception e) {
             e.printStackTrace();
-            return Result.error("Reservation creation failed: " + e.getMessage());
+            return Result.error("预约提交失败：" + e.getMessage());
         }
     }
 
@@ -146,7 +146,7 @@ public class ReservationController {
      * @return 更新后的预约记录信息
      */
     @PutMapping("/{id}")
-    @OperationLog(operationType = "UPDATE_BOOKING", detail = "Update reservation")
+    @OperationLog(operationType = "UPDATE_BOOKING", detail = "更新预约")
     public Result<Reservation> update(@PathVariable Long id, @RequestBody Reservation reservation) {
         if (!reservationRepository.existsById(id)) {
             return Result.error("预约不存在");
@@ -200,7 +200,7 @@ public class ReservationController {
         try {
             Long adminId = currentUserService.getCurrentUserId();
             if (adminId == null) {
-                return Result.error(401, "Unauthorized");
+                return Result.error(401, "未登录或登录已失效");
             }
             Optional<Reservation> reservationOpt = reservationRepository.findByVerificationCode(verificationCode);
             if (!reservationOpt.isPresent()) {
@@ -265,23 +265,23 @@ public class ReservationController {
     public Result<Reservation> approve(@PathVariable Long id, @RequestBody Reservation reservation) {
         Long adminId = currentUserService.getCurrentUserId();
         if (adminId == null) {
-            return Result.error(401, "Unauthorized");
+            return Result.error(401, "未登录或登录已失效");
         }
 
         Optional<Reservation> resOpt = reservationRepository.findById(id);
         if (!resOpt.isPresent()) {
-            return Result.error("Reservation not found");
+            return Result.error("预约不存在");
         }
 
         Reservation existingReservation = resOpt.get();
         if (!isValidStatusTransition(existingReservation.getStatus(), "APPROVED")) {
-            return Result.error("Current status does not allow approval");
+            return Result.error("当前预约状态不支持审核通过");
         }
 
         try {
             Reservation savedReservation = reservationService.approveReservation(id, reservation.getAdminRemark());
             enrichReservation(savedReservation);
-            return Result.success("Reservation approved", savedReservation);
+            return Result.success("预约审核已通过", savedReservation);
         } catch (IllegalArgumentException | IllegalStateException e) {
             return Result.error(e.getMessage());
         }
@@ -298,7 +298,7 @@ public class ReservationController {
     public Result<Reservation> reject(@PathVariable Long id, @RequestBody Reservation reservation) {
         Long adminId = currentUserService.getCurrentUserId();
         if (adminId == null) {
-            return Result.error(401, "Unauthorized");
+            return Result.error(401, "未登录或登录已失效");
         }
 
         Optional<Reservation> resOpt = reservationRepository.findById(id);
@@ -327,11 +327,11 @@ public class ReservationController {
      * @return 取消后的预约记录信息
      */
     @PutMapping("/{id}/cancel")
-    @OperationLog(operationType = "CANCEL_BOOKING", detail = "Cancel reservation")
+    @OperationLog(operationType = "CANCEL_BOOKING", detail = "取消预约")
     public Result<Reservation> cancel(@PathVariable Long id) {
         Long currentUserId = currentUserService.getCurrentUserId();
         if (currentUserId == null) {
-            return Result.error(401, "Unauthorized");
+            return Result.error(401, "未登录或登录已失效");
         }
 
         Optional<Reservation> resOpt = reservationRepository.findById(id);
@@ -341,7 +341,7 @@ public class ReservationController {
 
         Reservation existingReservation = resOpt.get();
         if (!Objects.equals(existingReservation.getUserId(), currentUserId) && !currentUserService.hasRole("ADMIN")) {
-            return Result.error(403, "Forbidden");
+            return Result.error(403, "无权执行当前操作");
         }
         
         // 验证取消规则
@@ -386,7 +386,7 @@ public class ReservationController {
     public Result<Reservation> complete(@PathVariable Long id) {
         Long adminId = currentUserService.getCurrentUserId();
         if (adminId == null) {
-            return Result.error(401, "Unauthorized");
+            return Result.error(401, "未登录或登录已失效");
         }
 
         Optional<Reservation> resOpt = reservationRepository.findById(id);
@@ -480,7 +480,7 @@ public class ReservationController {
     public Result<Reservation> checkin(@PathVariable Long id) {
         Long currentUserId = currentUserService.getCurrentUserId();
         if (currentUserId == null) {
-            return Result.error(401, "Unauthorized");
+            return Result.error(401, "未登录或登录已失效");
         }
 
         Optional<Reservation> resOpt = reservationRepository.findById(id);
@@ -490,12 +490,12 @@ public class ReservationController {
 
         Reservation reservation = resOpt.get();
         if (!Objects.equals(reservation.getUserId(), currentUserId) && !currentUserService.hasRole("ADMIN")) {
-            return Result.error(403, "Forbidden");
+            return Result.error(403, "无权执行当前操作");
         }
         
         // 检查预约状态
         if (!"APPROVED".equals(reservation.getStatus())) {
-            return Result.error("只有已通过的预约才能签到");
+            return Result.error("只有审核通过的预约才能签到");
         }
         
         // 检查签到状态
@@ -513,11 +513,11 @@ public class ReservationController {
         
         // 检查是否在预约时间范围内（可提前15分钟签到）
         if (now.isBefore(reservation.getStartTime().minusMinutes(15))) {
-            return Result.error("还未到签到时间，可提前15分钟签到");
+            return Result.error("当前还未到可签到时间，最多可提前15分钟签到");
         }
         
         if (now.isAfter(reservation.getEndTime())) {
-            return Result.error("预约时间已结束，无法签到");
+            return Result.error("当前预约时段已结束，无法签到");
         }
         
         // 更新签到信息
@@ -543,7 +543,7 @@ public class ReservationController {
     public Result<Reservation> checkout(@PathVariable Long id) {
         Long currentUserId = currentUserService.getCurrentUserId();
         if (currentUserId == null) {
-            return Result.error(401, "Unauthorized");
+            return Result.error(401, "未登录或登录已失效");
         }
 
         Optional<Reservation> resOpt = reservationRepository.findById(id);
@@ -553,17 +553,17 @@ public class ReservationController {
 
         Reservation reservation = resOpt.get();
         if (!Objects.equals(reservation.getUserId(), currentUserId) && !currentUserService.hasRole("ADMIN")) {
-            return Result.error(403, "Forbidden");
+            return Result.error(403, "无权执行当前操作");
         }
         
         // 检查预约状态
         if (!"APPROVED".equals(reservation.getStatus())) {
-            return Result.error("只有已通过的预约才能签退");
+            return Result.error("只有审核通过的预约才能签退");
         }
         
         // 检查签到状态
         if (!"CHECKED_IN".equals(reservation.getCheckinStatus())) {
-            return Result.error("请先签到后再签退");
+            return Result.error("请先完成签到，再进行签退");
         }
         
         // 更新签退信息
@@ -591,7 +591,7 @@ public class ReservationController {
                                      @RequestParam String verificationCode) {
         Long adminId = currentUserService.getCurrentUserId();
         if (adminId == null) {
-            return Result.error(401, "Unauthorized");
+            return Result.error(401, "未登录或登录已失效");
         }
 
         Optional<Reservation> resOpt = reservationRepository.findById(id);
@@ -653,7 +653,7 @@ public class ReservationController {
             }
             
             if (start.isBefore(LocalDateTime.now())) {
-                return Result.error("不能预约过去的时间");
+                return Result.error("开始时间不能早于当前时间，请重新选择");
             }
             
             // 检查时间冲突
@@ -664,7 +664,7 @@ public class ReservationController {
             
             Map<String, Object> result = new HashMap<>();
             result.put("available", conflictingReservations.isEmpty());
-            result.put("message", conflictingReservations.isEmpty() ? "该时间段可用" : "该时间段已被预约");
+            result.put("message", conflictingReservations.isEmpty() ? "当前时段可以预约" : "当前时段已被其他预约占用");
             
             return Result.success(result);
         } catch (Exception e) {
@@ -682,7 +682,7 @@ public class ReservationController {
     public Result<Map<String, String>> getVerificationCode(@PathVariable Long id) {
         Long currentUserId = currentUserService.getCurrentUserId();
         if (currentUserId == null) {
-            return Result.error(401, "Unauthorized");
+            return Result.error(401, "未登录或登录已失效");
         }
 
         Optional<Reservation> resOpt = reservationRepository.findById(id);
@@ -692,7 +692,7 @@ public class ReservationController {
 
         Reservation reservation = resOpt.get();
         if (!Objects.equals(reservation.getUserId(), currentUserId) && !currentUserService.hasRole("ADMIN")) {
-            return Result.error(403, "Forbidden");
+            return Result.error(403, "无权执行当前操作");
         }
         if (reservation.getVerificationCode() == null) {
             return Result.error("该预约暂无核销码");
@@ -1061,7 +1061,7 @@ public class ReservationController {
                     .count();
             
             if (dailyCount >= ruleConfig.getMaxBookingsPerDay()) {
-                return Result.error("您今日预约次数已达上限（" + ruleConfig.getMaxBookingsPerDay() + "次）");
+                return Result.error("当前类别设施当日预约次数已达上限（" + ruleConfig.getMaxBookingsPerDay() + "次），无法进行预约");
             }
         }
 
@@ -1073,7 +1073,7 @@ public class ReservationController {
             );
             
             if (userActiveReservations.size() >= ruleConfig.getMaxActiveBookings()) {
-                return Result.error("您的活跃预约数量已达上限（" + ruleConfig.getMaxActiveBookings() + "个）");
+                return Result.error("当前类别设施预约数已达上限（" + ruleConfig.getMaxActiveBookings() + "个），无法进行预约");
             }
         }
 

@@ -149,14 +149,14 @@ public class RuleConfigService {
             // 简化处理，实际使用时需要传入当日预约数量
             long dailyBookings = 0; // 需要外部提供
             if (dailyBookings >= ruleConfig.getMaxBookingsPerDay()) {
-                return Result.error("您今日预约次数已达上限（" + ruleConfig.getMaxBookingsPerDay() + "次）");
+                return Result.error("当前类别设施当日预约次数已达上限（" + ruleConfig.getMaxBookingsPerDay() + "次），无法进行预约");
             }
         }
 
         // 验证活跃预约数量限制
         if (ruleConfig.getMaxActiveBookings() != null) {
             if (currentActiveBookings >= ruleConfig.getMaxActiveBookings()) {
-                return Result.error("您的活跃预约数量已达上限（" + ruleConfig.getMaxActiveBookings() + "个）");
+                return Result.error("当前类别设施预约数已达上限（" + ruleConfig.getMaxActiveBookings() + "个），无法进行预约");
             }
         }
 

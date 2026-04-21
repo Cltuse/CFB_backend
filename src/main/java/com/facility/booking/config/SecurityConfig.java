@@ -48,9 +48,9 @@ public class SecurityConfig {
                 )
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint((request, response, authException) ->
-                                writeError(response, HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized"))
+                                writeError(response, HttpServletResponse.SC_UNAUTHORIZED, "未登录或登录已失效"))
                         .accessDeniedHandler((request, response, accessDeniedException) ->
-                                writeError(response, HttpServletResponse.SC_FORBIDDEN, "Forbidden"))
+                                writeError(response, HttpServletResponse.SC_FORBIDDEN, "无权执行当前操作"))
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
