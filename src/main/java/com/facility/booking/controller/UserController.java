@@ -269,6 +269,16 @@ public class UserController {
         return Result.success(users);
     }
 
+    @GetMapping("/maintainers")
+    @PreAuthorize("hasRole('ADMIN')")
+    public Result<List<User>> listMaintainers() {
+        List<User> maintainers = userRepository.findByRoleOrderByRealNameAsc("MAINTAINER")
+                .stream()
+                .map(this::toSafeUser)
+                .toList();
+        return Result.success(maintainers);
+    }
+
     private User toSafeUser(User user) {
         User safeUser = new User();
         safeUser.setId(user.getId());

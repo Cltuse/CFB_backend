@@ -18,6 +18,7 @@ import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 public class ReservationService {
@@ -107,6 +108,9 @@ public class ReservationService {
 
         reservation.setStatus(initialStatus);
         reservation.setCheckinStatus("NOT_CHECKED");
+        if ("APPROVED".equals(initialStatus) && (reservation.getVerificationCode() == null || reservation.getVerificationCode().isBlank())) {
+            reservation.setVerificationCode(generateVerificationCode());
+        }
         return reservationRepository.save(reservation);
     }
 
@@ -122,6 +126,9 @@ public class ReservationService {
 
         reservation.setStatus("APPROVED");
         reservation.setAdminRemark(adminRemark);
+        if (reservation.getVerificationCode() == null || reservation.getVerificationCode().isBlank()) {
+            reservation.setVerificationCode(generateVerificationCode());
+        }
         return reservationRepository.save(reservation);
     }
 
@@ -267,5 +274,9 @@ public class ReservationService {
         }
 
         return ruleConfigRepository.findByCategoryIdIsNull().orElse(null);
+    }
+
+    private String generateVerificationCode() {
+        return UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
     }
 }

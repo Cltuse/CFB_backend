@@ -35,3 +35,9 @@ CREATE INDEX idx_feedback_status_created_at ON feedback (status, created_at);
 CREATE INDEX idx_notice_status_publish_time ON notice (status, publish_time);
 CREATE INDEX idx_maintenance_facility_created_at ON maintenance (facility_id, created_at);
 CREATE INDEX idx_maintenance_maintainer_created_at ON maintenance (maintainer_id, created_at);
+
+-- 6) facility maintainer binding
+-- Add this column before enabling the facility-to-maintainer binding in production.
+-- ALTER TABLE facility
+--   ADD COLUMN maintainer_id BIGINT NULL;
+CREATE INDEX idx_facility_maintainer_id ON facility (maintainer_id);

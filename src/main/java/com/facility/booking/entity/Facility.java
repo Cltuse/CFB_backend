@@ -28,6 +28,9 @@ public class Facility {
     @Column(length = 200)
     private String location;
 
+    @Column(name = "maintainer_id")
+    private Long maintainerId;
+
     @Column(length = 20)
     private String status = "AVAILABLE"; // AVAILABLE, MAINTENANCE, DAMAGED
 
@@ -42,6 +45,9 @@ public class Facility {
 
     @Column(length = 500)
     private String imageUrl = "/files/facility/default-facility.svg";
+
+    @Transient
+    private String maintainerName;
 
     public String getImageUrl() {
         return StoredFileUrlUtils.normalizeForClient(imageUrl);

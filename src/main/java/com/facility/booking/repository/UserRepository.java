@@ -14,6 +14,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByEmail(String email);
 
+    List<User> findByRoleOrderByRealNameAsc(String role);
+
     @Query("SELECT u FROM User u WHERE u.realName LIKE %:keyword% OR u.username LIKE %:keyword%")
     List<User> findByRealNameLikeOrUsernameLike(@Param("keyword") String keyword);
 }
