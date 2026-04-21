@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -718,6 +719,164 @@ public class ReservationController {
         result.put("categoryData", pieData);
         result.put("total", total);
 
+        return Result.success(result);
+    }
+
+    @GetMapping("/stats/heatmap")
+    public Result<Map<String, Object>> getHeatmapStats(@RequestParam(required = false) String range) {
+        LocalDateTime startTime = range != null ? getStartTimeByRange(range) : LocalDateTime.now().minusDays(30);
+        LocalDateTime now = LocalDateTime.now();
+
+        List<Reservation> reservations = reservationRepository.findByStartTimeAfter(startTime).stream()
+                .filter(reservation -> !("REJECTED".equals(reservation.getStatus()) || "CANCELLED".equals(reservation.getStatus())))
+                .collect(java.util.stream.Collectors.toList());
+
+        if (currentUserService.hasRole("MAINTAINER")) {
+            Set<Long> facilityIds = getCurrentMaintainerFacilityIds();
+            reservations = reservations.stream()
+                    .filter(reservation -> reservation.getFacilityId() != null && facilityIds.contains(reservation.getFacilityId()))
+                    .collect(java.util.stream.Collectors.toList());
+        }
+
+        Set<Long> facilityIds = reservations.stream()
+                .map(Reservation::getFacilityId)
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+
+        Map<Long, Facility> facilitiesById = facilityRepository.findAllById(facilityIds)
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(Facility::getId, facility -> facility));
+
+        Map<Long, Long> facilityReservationCount = reservations.stream()
+                .filter(reservation -> reservation.getFacilityId() != null)
+                .collect(java.util.stream.Collectors.groupingBy(Reservation::getFacilityId, java.util.stream.Collectors.counting()));
+
+        List<Long> sortedFacilityIds = new ArrayList<>(facilityIds);
+        sortedFacilityIds.sort(Comparator
+                .comparing((Long facilityId) -> facilityReservationCount.getOrDefault(facilityId, 0L), Comparator.reverseOrder())
+                .thenComparing(facilityId -> {
+                    Facility facility = facilitiesById.get(facilityId);
+                    return facility != null ? facility.getName() : "";
+                }));
+
+        List<String> timeSlots = new ArrayList<>();
+        for (int hour = 0; hour < 24; hour++) {
+            timeSlots.add(String.format("%02d:00", hour));
+        }
+
+        List<String> facilityAxis = sortedFacilityIds.stream()
+                .map(facilityId -> {
+                    Facility facility = facilitiesById.get(facilityId);
+                    return facility != null ? facility.getName() : "未知场地";
+                })
+                .toList();
+
+        Map<Long, Integer> facilityIndexMap = new HashMap<>();
+        for (int index = 0; index < sortedFacilityIds.size(); index++) {
+            facilityIndexMap.put(sortedFacilityIds.get(index), index);
+        }
+
+        Map<String, Integer> heatmapCounter = new HashMap<>();
+        Map<Integer, Long> peakHourCounter = new HashMap<>();
+        Map<String, Long> regionBookingCounter = new HashMap<>();
+        Map<String, Double> regionReservedHours = new HashMap<>();
+        Map<String, Set<Long>> regionFacilityIds = new HashMap<>();
+        Map<Long, Double> facilityReservedHours = new HashMap<>();
+
+        for (Reservation reservation : reservations) {
+            if (reservation.getFacilityId() == null || !facilityIndexMap.containsKey(reservation.getFacilityId())) {
+                continue;
+            }
+
+            Facility facility = facilitiesById.get(reservation.getFacilityId());
+            String location = facility != null && facility.getLocation() != null && !facility.getLocation().isBlank()
+                    ? facility.getLocation()
+                    : "未标注区域";
+
+            double reservedHours = Math.max(Duration.between(reservation.getStartTime(), reservation.getEndTime()).toMinutes() / 60D, 0.5D);
+            facilityReservedHours.merge(reservation.getFacilityId(), reservedHours, Double::sum);
+            regionBookingCounter.merge(location, 1L, Long::sum);
+            regionReservedHours.merge(location, reservedHours, Double::sum);
+            regionFacilityIds.computeIfAbsent(location, key -> new LinkedHashSet<>()).add(reservation.getFacilityId());
+
+            LocalDateTime cursor = reservation.getStartTime()
+                    .withMinute(0)
+                    .withSecond(0)
+                    .withNano(0);
+            while (cursor.isBefore(reservation.getEndTime())) {
+                int hour = cursor.getHour();
+                String key = facilityIndexMap.get(reservation.getFacilityId()) + "_" + hour;
+                heatmapCounter.merge(key, 1, Integer::sum);
+                peakHourCounter.merge(hour, 1L, Long::sum);
+                cursor = cursor.plusHours(1);
+            }
+        }
+
+        List<List<Integer>> heatmapData = new ArrayList<>();
+        for (Map.Entry<String, Integer> entry : heatmapCounter.entrySet()) {
+            String[] parts = entry.getKey().split("_");
+            int facilityIndex = Integer.parseInt(parts[0]);
+            int hourIndex = Integer.parseInt(parts[1]);
+            heatmapData.add(List.of(hourIndex, facilityIndex, entry.getValue()));
+        }
+
+        long totalHoursInRange = Math.max(Duration.between(startTime, now).toHours(), 1L);
+
+        List<Map<String, Object>> facilityUsage = sortedFacilityIds.stream()
+                .map(facilityId -> {
+                    Facility facility = facilitiesById.get(facilityId);
+                    double reservedHours = facilityReservedHours.getOrDefault(facilityId, 0D);
+                    double utilizationRate = Math.min((reservedHours / totalHoursInRange) * 100D, 100D);
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("facilityId", facilityId);
+                    item.put("facilityName", facility != null ? facility.getName() : "未知场地");
+                    item.put("location", facility != null ? facility.getLocation() : "未标注区域");
+                    item.put("reservationCount", facilityReservationCount.getOrDefault(facilityId, 0L));
+                    item.put("reservedHours", Math.round(reservedHours * 10D) / 10D);
+                    item.put("utilizationRate", Math.round(utilizationRate * 10D) / 10D);
+                    return item;
+                })
+                .toList();
+
+        List<Map<String, Object>> peakHours = peakHourCounter.entrySet().stream()
+                .sorted(Map.Entry.<Integer, Long>comparingByValue(Comparator.reverseOrder()))
+                .limit(6)
+                .map(entry -> {
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("hour", String.format("%02d:00", entry.getKey()));
+                    item.put("bookingCount", entry.getValue());
+                    return item;
+                })
+                .toList();
+
+        List<Map<String, Object>> hotRegions = regionBookingCounter.entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue(Comparator.reverseOrder()))
+                .limit(8)
+                .map(entry -> {
+                    String location = entry.getKey();
+                    double reservedHours = regionReservedHours.getOrDefault(location, 0D);
+                    int facilityCount = regionFacilityIds.getOrDefault(location, Set.of()).size();
+                    double utilizationRate = facilityCount == 0
+                            ? 0D
+                            : Math.min((reservedHours / (totalHoursInRange * facilityCount)) * 100D, 100D);
+
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("location", location);
+                    item.put("bookingCount", entry.getValue());
+                    item.put("facilityCount", facilityCount);
+                    item.put("utilizationRate", Math.round(utilizationRate * 10D) / 10D);
+                    return item;
+                })
+                .toList();
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("range", range != null ? range : "30d");
+        result.put("timeSlots", timeSlots);
+        result.put("facilities", facilityAxis);
+        result.put("heatmapData", heatmapData);
+        result.put("facilityUsage", facilityUsage);
+        result.put("peakHours", peakHours);
+        result.put("hotRegions", hotRegions);
         return Result.success(result);
     }
 
