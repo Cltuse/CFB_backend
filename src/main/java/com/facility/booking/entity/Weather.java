@@ -13,5 +13,7 @@ public class Weather {
     private String weatherIcon;
     private String moodQuote;
     private String city;
+    private String ipAddress;
+    private String regionAddress;
     private String updateTime;
 }

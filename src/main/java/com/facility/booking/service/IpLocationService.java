@@ -3,97 +3,146 @@ package com.facility.booking.service;
 import com.facility.booking.util.HttpUtil;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class IpLocationService {
 
+    public record LocationInfo(String ipAddress, String city, String regionAddress) {}
+
     @Value("${ip.location.api}")
     private String ipLocationApi;
-    
-    // 缓存IP对应的城市信息，每小时更新一次
+
     private final ConcurrentHashMap<String, IpLocationCache> ipCache = new ConcurrentHashMap<>();
-    
+
     private static class IpLocationCache {
-        String city;
-        LocalDateTime timestamp;
-        
-        IpLocationCache(String city) {
+        private final String city;
+        private final String regionAddress;
+        private final LocalDateTime timestamp;
+
+        private IpLocationCache(String city, String regionAddress) {
             this.city = city;
+            this.regionAddress = regionAddress;
             this.timestamp = LocalDateTime.now();
         }
-        
-        boolean isExpired() {
+
+        private boolean isExpired() {
             return LocalDateTime.now().isAfter(timestamp.plusHours(1));
         }
     }
 
-    /**
-     * 根据IP地址获取地理位置
-     */
     public String getLocationByIp(String ip) {
-        // 检查是否是本地IP
-        if (isLocalIp(ip)) {
-            return "北京"; // 本地IP返回默认城市
+        return getLocationInfoByIp(ip).city();
+    }
+
+    public LocationInfo getLocationInfoByIp(String ip) {
+        String normalizedIp = normalizeIp(ip);
+
+        if (isLocalIp(normalizedIp)) {
+            return new LocationInfo(normalizedIp, "北京", "本机访问 / 局域网环境");
         }
-        
-        // 检查缓存
-        IpLocationCache cache = ipCache.get(ip);
+
+        IpLocationCache cache = ipCache.get(normalizedIp);
         if (cache != null && !cache.isExpired()) {
-            return cache.city;
+            return new LocationInfo(normalizedIp, cache.city, cache.regionAddress);
         }
-        
+
         try {
-            String url = ipLocationApi + ip + "&json=true";
-            String response = HttpUtil.get(url);
-            
-            // 使用Spring Boot自带的ObjectMapper解析JSON
+            String response = HttpUtil.get(ipLocationApi + normalizedIp + "&json=true");
             ObjectMapper objectMapper = new ObjectMapper();
             JsonNode jsonNode = objectMapper.readTree(response);
-            
-            String city = jsonNode.get("city").asText();
-            String result = city.isEmpty() ? "北京" : city;
-            
-            // 更新缓存
-            ipCache.put(ip, new IpLocationCache(result));
-            return result;
+
+            String city = readText(jsonNode, "city");
+            String province = readText(jsonNode, "pro");
+            String region = readText(jsonNode, "region");
+            String addr = readText(jsonNode, "addr");
+            String resultCity = city.isEmpty() ? "北京" : city;
+            String regionAddress = buildRegionAddress(province, city, region, addr, resultCity);
+
+            ipCache.put(normalizedIp, new IpLocationCache(resultCity, regionAddress));
+            return new LocationInfo(normalizedIp, resultCity, regionAddress);
         } catch (Exception e) {
-            return "北京"; // 默认返回北京
+            return new LocationInfo(normalizedIp, "北京", "IP归属地暂时无法获取");
         }
     }
-    
-    /**
-     * 判断是否为本地IP
-     */
+
+    public String getClientIp(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (isUnknown(ip)) {
+            ip = request.getHeader("Proxy-Client-IP");
+        }
+        if (isUnknown(ip)) {
+            ip = request.getHeader("WL-Proxy-Client-IP");
+        }
+        if (isUnknown(ip)) {
+            ip = request.getHeader("HTTP_CLIENT_IP");
+        }
+        if (isUnknown(ip)) {
+            ip = request.getHeader("HTTP_X_FORWARDED_FOR");
+        }
+        if (isUnknown(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        return normalizeIp(ip);
+    }
+
+    private boolean isUnknown(String ip) {
+        return ip == null || ip.isBlank() || "unknown".equalsIgnoreCase(ip);
+    }
+
     private boolean isLocalIp(String ip) {
         return "127.0.0.1".equals(ip) || "0:0:0:0:0:0:0:1".equals(ip) || "localhost".equals(ip);
     }
 
-    /**
-     * 从请求中获取客户端IP地址
-     */
-    public String getClientIp(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-        if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("Proxy-Client-IP");
+    private String normalizeIp(String ip) {
+        if (ip == null || ip.isBlank()) {
+            return "127.0.0.1";
         }
-        if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("WL-Proxy-Client-IP");
+
+        String normalized = ip.trim();
+        int commaIndex = normalized.indexOf(',');
+        if (commaIndex >= 0) {
+            normalized = normalized.substring(0, commaIndex).trim();
         }
-        if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("HTTP_CLIENT_IP");
+
+        return normalized.isEmpty() ? "127.0.0.1" : normalized;
+    }
+
+    private String readText(JsonNode jsonNode, String fieldName) {
+        JsonNode fieldNode = jsonNode.get(fieldName);
+        if (fieldNode == null || fieldNode.isNull()) {
+            return "";
         }
-        if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("HTTP_X_FORWARDED_FOR");
+
+        String value = fieldNode.asText();
+        return value == null ? "" : value.trim();
+    }
+
+    private String buildRegionAddress(String province, String city, String region, String addr, String fallbackCity) {
+        List<String> parts = new ArrayList<>();
+
+        if (!province.isEmpty()) {
+            parts.add(province);
         }
-        if (ip == null || ip.length() == 0 || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getRemoteAddr();
+        if (!city.isEmpty() && !city.equals(province)) {
+            parts.add(city);
         }
-        return ip;
+        if (!region.isEmpty() && !region.equals(city)) {
+            parts.add(region);
+        }
+
+        String joined = String.join(" ", parts).trim();
+        if (!addr.isEmpty() && (joined.isEmpty() || !addr.contains(joined))) {
+            joined = joined.isEmpty() ? addr : joined + " " + addr;
+        }
+
+        return joined.isEmpty() ? fallbackCity : joined;
     }
 }

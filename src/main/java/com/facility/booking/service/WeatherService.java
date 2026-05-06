@@ -254,19 +254,20 @@ public class WeatherService {
      * 根据IP地址获取天气信息
      */
     public Weather getWeatherByIp(HttpServletRequest request) {
+        String clientIp = ipLocationService.getClientIp(request);
         try {
-            // 获取客户端IP
-            String clientIp = ipLocationService.getClientIp(request);
-            
-            // 根据IP获取城市
-            String city = ipLocationService.getLocationByIp(clientIp);
-            
-            // 获取该城市的天气信息
-            return getWeatherByCity(city);
+            IpLocationService.LocationInfo locationInfo = ipLocationService.getLocationInfoByIp(clientIp);
+            Weather weather = getWeatherByCity(locationInfo.city());
+            weather.setIpAddress(locationInfo.ipAddress());
+            weather.setRegionAddress(locationInfo.regionAddress());
+            weather.setCity(locationInfo.city());
+            return weather;
         } catch (Exception e) {
             System.err.println("根据IP获取天气失败，使用默认城市: " + e.getMessage());
-            // 失败时返回默认城市天气
-            return getWeatherByCity("北京");
+            Weather weather = getWeatherByCity("北京");
+            weather.setIpAddress(clientIp);
+            weather.setRegionAddress("IP归属地暂时无法获取");
+            return weather;
         }
     }
     

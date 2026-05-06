@@ -86,7 +86,7 @@ public class ReservationService {
             return "单次预约时长不能超过24小时，请调整预约时段";
         }
 
-        return validateReservationRules(reservation, facilityOpt.get());
+        return validateReservationRules(reservation, facilityOpt.get(), null);
     }
 
     @Transactional
@@ -94,7 +94,7 @@ public class ReservationService {
         Facility facility = facilityRepository.findByIdWithLock(reservation.getFacilityId())
                 .orElseThrow(() -> new IllegalArgumentException("设施不存在或已被删除"));
 
-        String ruleError = validateReservationRules(reservation, facility);
+        String ruleError = validateReservationRules(reservation, facility, null);
         if (ruleError != null) {
             throw new IllegalArgumentException(ruleError);
         }
@@ -108,10 +108,59 @@ public class ReservationService {
 
         reservation.setStatus(initialStatus);
         reservation.setCheckinStatus("NOT_CHECKED");
-        if ("APPROVED".equals(initialStatus) && (reservation.getVerificationCode() == null || reservation.getVerificationCode().isBlank())) {
+        if ("APPROVED".equals(initialStatus) && isBlank(reservation.getVerificationCode())) {
             reservation.setVerificationCode(generateVerificationCode());
         }
         return reservationRepository.save(reservation);
+    }
+
+    @Transactional
+    public Reservation updateReservation(Long reservationId, Reservation updates) {
+        Reservation existingReservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new IllegalArgumentException("预约不存在"));
+
+        if (!Arrays.asList("PENDING", "APPROVED").contains(existingReservation.getStatus())) {
+            throw new IllegalStateException("只有待审核和已通过的预约可以编辑");
+        }
+
+        if (!"NOT_CHECKED".equals(existingReservation.getCheckinStatus())) {
+            throw new IllegalStateException("已进入签到流程的预约不支持编辑");
+        }
+
+        Facility facility = facilityRepository.findByIdWithLock(existingReservation.getFacilityId())
+                .orElseThrow(() -> new IllegalArgumentException("设施不存在或已被删除"));
+
+        LocalDateTime startTime = updates.getStartTime() != null ? updates.getStartTime() : existingReservation.getStartTime();
+        LocalDateTime endTime = updates.getEndTime() != null ? updates.getEndTime() : existingReservation.getEndTime();
+        String purpose = updates.getPurpose() != null ? updates.getPurpose().trim() : existingReservation.getPurpose();
+        String adminRemark = updates.getAdminRemark() != null ? updates.getAdminRemark().trim() : existingReservation.getAdminRemark();
+
+        if (isBlank(purpose)) {
+            throw new IllegalArgumentException("预约用途不能为空");
+        }
+
+        existingReservation.setStartTime(startTime);
+        existingReservation.setEndTime(endTime);
+        existingReservation.setPurpose(purpose);
+        existingReservation.setAdminRemark(isBlank(adminRemark) ? null : adminRemark);
+
+        String validationError = validateReservationForUpdate(existingReservation, facility);
+        if (validationError != null) {
+            throw new IllegalArgumentException(validationError);
+        }
+
+        ensureNoConflicts(
+                existingReservation.getFacilityId(),
+                existingReservation.getStartTime(),
+                existingReservation.getEndTime(),
+                existingReservation.getId()
+        );
+
+        if ("APPROVED".equals(existingReservation.getStatus()) && isBlank(existingReservation.getVerificationCode())) {
+            existingReservation.setVerificationCode(generateVerificationCode());
+        }
+
+        return reservationRepository.save(existingReservation);
     }
 
     @Transactional
@@ -126,7 +175,7 @@ public class ReservationService {
 
         reservation.setStatus("APPROVED");
         reservation.setAdminRemark(adminRemark);
-        if (reservation.getVerificationCode() == null || reservation.getVerificationCode().isBlank()) {
+        if (isBlank(reservation.getVerificationCode())) {
             reservation.setVerificationCode(generateVerificationCode());
         }
         return reservationRepository.save(reservation);
@@ -196,6 +245,10 @@ public class ReservationService {
     }
 
     public String validateReservationRules(Reservation reservation, Facility facility) {
+        return validateReservationRules(reservation, facility, null);
+    }
+
+    public String validateReservationRules(Reservation reservation, Facility facility, Long excludeReservationId) {
         RuleConfig ruleConfig = getApplicableRuleConfig(facility);
         if (ruleConfig == null) {
             return null;
@@ -227,7 +280,8 @@ public class ReservationService {
             }
         }
 
-        if (ruleConfig.getAllowSameDayBooking() != null && !ruleConfig.getAllowSameDayBooking()
+        if (ruleConfig.getAllowSameDayBooking() != null
+                && !ruleConfig.getAllowSameDayBooking()
                 && startTime.toLocalDate().equals(now.toLocalDate())) {
             return "不允许当日预约";
         }
@@ -243,6 +297,7 @@ public class ReservationService {
         if (ruleConfig.getMaxBookingsPerDay() != null) {
             LocalDate reservationDate = startTime.toLocalDate();
             long dailyCount = reservationRepository.findByUserId(reservation.getUserId()).stream()
+                    .filter(r -> excludeReservationId == null || !excludeReservationId.equals(r.getId()))
                     .filter(r -> r.getStartTime().toLocalDate().equals(reservationDate))
                     .filter(r -> !("REJECTED".equals(r.getStatus()) || "CANCELLED".equals(r.getStatus())))
                     .count();
@@ -257,12 +312,37 @@ public class ReservationService {
                     reservation.getUserId(),
                     Arrays.asList("PENDING", "APPROVED")
             );
-            if (userActiveReservations.size() >= ruleConfig.getMaxActiveBookings()) {
+            long activeCount = userActiveReservations.stream()
+                    .filter(r -> excludeReservationId == null || !excludeReservationId.equals(r.getId()))
+                    .count();
+            if (activeCount >= ruleConfig.getMaxActiveBookings()) {
                 return "当前类别设施预约数已达上限（" + ruleConfig.getMaxActiveBookings() + "个），无法进行预约";
             }
         }
 
         return null;
+    }
+
+    private String validateReservationForUpdate(Reservation reservation, Facility facility) {
+        if (reservation.getStartTime() == null) {
+            return "开始时间不能为空";
+        }
+        if (reservation.getEndTime() == null) {
+            return "结束时间不能为空";
+        }
+        if (!reservation.getEndTime().isAfter(reservation.getStartTime())) {
+            return "结束时间必须晚于开始时间";
+        }
+        if (reservation.getStartTime().isBefore(LocalDateTime.now())) {
+            return "只能编辑当前或未来的预约时段";
+        }
+
+        long durationHours = java.time.Duration.between(reservation.getStartTime(), reservation.getEndTime()).toHours();
+        if (durationHours > 24) {
+            return "单次预约时长不能超过24小时，请调整预约时段";
+        }
+
+        return validateReservationRules(reservation, facility, reservation.getId());
     }
 
     private RuleConfig getApplicableRuleConfig(Facility facility) {
@@ -278,5 +358,9 @@ public class ReservationService {
 
     private String generateVerificationCode() {
         return UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }

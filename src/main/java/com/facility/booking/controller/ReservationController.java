@@ -140,13 +140,30 @@ public class ReservationController {
     @PutMapping("/{id}")
     @OperationLog(operationType = "UPDATE_BOOKING", detail = "更新预约")
     public Result<Reservation> update(@PathVariable Long id, @RequestBody Reservation reservation) {
-        if (!reservationRepository.existsById(id)) {
+        Long operatorId = currentUserService.getCurrentUserId();
+        if (operatorId == null) {
+            return Result.error(401, "未登录或登录已失效");
+        }
+
+        Optional<Reservation> existingReservationOpt = reservationRepository.findById(id);
+        if (existingReservationOpt.isEmpty()) {
             return Result.error("预约不存在");
         }
-        reservation.setId(id);
-        Reservation savedReservation = reservationRepository.save(reservation);
-        enrichReservation(savedReservation);
-        return Result.success("更新成功", savedReservation);
+
+        Reservation existingReservation = existingReservationOpt.get();
+        boolean isAdmin = currentUserService.hasRole("ADMIN");
+        boolean isMaintainer = currentUserService.hasRole("MAINTAINER");
+        if (!isAdmin && !(isMaintainer && canCurrentMaintainerManageFacility(existingReservation.getFacilityId()))) {
+            return Result.error(403, "无权编辑该预约记录");
+        }
+
+        try {
+            Reservation savedReservation = reservationService.updateReservation(id, reservation);
+            enrichReservation(savedReservation);
+            return Result.success("更新成功", savedReservation);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return Result.error(e.getMessage());
+        }
     }
 
     /**
