@@ -67,6 +67,5 @@ public interface MaintenanceRepository extends JpaRepository<Maintenance, Long> 
     List<FacilityFaultView> findTopFacilityFaultsAfter(@Param("startTime") LocalDateTime startTime,
                                                        @Param("limit") int limit);
 
-    List<Maintenance> findByStatusAndStartTimeLessThanEqualAndStartTimeAfter(
-            String status, LocalDateTime latestStartTime, LocalDateTime earliestStartTime);
+    List<Maintenance> findByStatusAndStartTimeLessThanEqual(String status, LocalDateTime latestStartTime);
 }

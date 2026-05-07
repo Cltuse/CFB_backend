@@ -147,7 +147,7 @@ public class FacilityController {
         List<Map<String, Object>> timeline = new ArrayList<>();
 
         for (Reservation reservation : reservations) {
-            if (!reservation.getStartTime().isAfter(now) || !reservation.getStartTime().isBefore(endDate)) {
+            if (!reservation.getEndTime().isAfter(now) || !reservation.getStartTime().isBefore(endDate)) {
                 continue;
             }
             if ("REJECTED".equals(reservation.getStatus()) || "CANCELLED".equals(reservation.getStatus())) {
@@ -236,7 +236,7 @@ public class FacilityController {
     @PostMapping
     @OperationLog(operationType = "CREATE_FACILITY", detail = "创建设施")
     public Result<Facility> create(@RequestBody Facility facility) {
-        if (!currentUserService.hasRole("ADMIN")) {
+        if (!currentUserService.hasRole("ADMIN") && !currentUserService.hasRole("MAINTAINER")) {
             return Result.error(403, "仅系统管理员可创建设施");
         }
 
@@ -425,8 +425,8 @@ public class FacilityController {
     @DeleteMapping("/{id}")
     @OperationLog(operationType = "DELETE_FACILITY", detail = "删除设施")
     public Result<Void> delete(@PathVariable Long id) {
-        if (!currentUserService.hasRole("ADMIN")) {
-            return Result.error(403, "仅系统管理员可删除设施");
+        if (!currentUserService.hasRole("ADMIN") && !currentUserService.hasRole("MAINTAINER")) {
+            return Result.error(403, "仅系统管理员和设施管理员可删除设施");
         }
 
         Optional<Facility> facilityOpt = facilityRepository.findById(id);
@@ -435,6 +435,9 @@ public class FacilityController {
         }
 
         Facility facility = facilityOpt.get();
+        if (currentUserService.hasRole("MAINTAINER") && !canCurrentMaintainerAccessFacility(facility)) {
+            return Result.error(403, "鏃犳潈鍒犻櫎璇ヨ鏂?);
+        }
         if (facility.getImageUrl() != null && !facility.getImageUrl().isBlank()) {
             fileUploadService.deleteFile(facility.getImageUrl());
         }

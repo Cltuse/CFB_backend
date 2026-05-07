@@ -134,6 +134,7 @@ public class MaintenanceController {
         if (maintenance.getStatus() == null || maintenance.getStatus().isBlank()) {
             maintenance.setStatus("PENDING");
         }
+        normalizeMaintenanceStatusByTime(maintenance);
 
         fillMaintainerName(maintenance);
         Maintenance savedMaintenance = maintenanceRepository.save(maintenance);
@@ -198,6 +199,7 @@ public class MaintenanceController {
         if (validationError != null) {
             return Result.error(validationError);
         }
+        normalizeMaintenanceStatusByTime(maintenance);
 
         maintenance.setId(id);
         fillMaintainerName(maintenance);
@@ -405,25 +407,27 @@ public class MaintenanceController {
         return Result.success(result);
     }
 
-    @Scheduled(cron = "0 0/5 * * * ?")
+    @Scheduled(cron = "0 */15 * * * ?")
     public void checkPendingMaintenances() {
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime fifteenMinutesLater = now.plusMinutes(15);
         List<Maintenance> pendingMaintenances = maintenanceRepository
-                .findByStatusAndStartTimeLessThanEqualAndStartTimeAfter("PENDING", fifteenMinutesLater, now.minusMinutes(15));
+                .findByStatusAndStartTimeLessThanEqual("PENDING", now);
 
         for (Maintenance maintenance : pendingMaintenances) {
             maintenance.setStatus("IN_PROGRESS");
-            maintenanceRepository.save(maintenance);
+            Maintenance savedMaintenance = maintenanceRepository.save(maintenance);
+            syncFacilityStatus(savedMaintenance, "PENDING");
+        }
+    }
 
-            Optional<Facility> facilityOpt = facilityRepository.findById(maintenance.getFacilityId());
-            if (facilityOpt.isPresent()) {
-                Facility facility = facilityOpt.get();
-                if (!"MAINTENANCE".equals(facility.getStatus())) {
-                    facility.setStatus("MAINTENANCE");
-                    facilityRepository.save(facility);
-                }
-            }
+    private void normalizeMaintenanceStatusByTime(Maintenance maintenance) {
+        if (maintenance == null || !"PENDING".equals(maintenance.getStatus()) || maintenance.getStartTime() == null) {
+            return;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        if (!maintenance.getStartTime().isAfter(now)) {
+            maintenance.setStatus("IN_PROGRESS");
         }
     }
 
@@ -598,8 +602,9 @@ public class MaintenanceController {
             return;
         }
 
+        LocalDateTime now = LocalDateTime.now();
         boolean hasActiveMaintenance = maintenanceRepository.findByFacilityId(facilityId).stream()
-                .anyMatch(item -> "PENDING".equals(item.getStatus()) || "IN_PROGRESS".equals(item.getStatus()));
+                .anyMatch(item -> isMaintenanceOccupyingFacility(item, now));
 
         if (!hasActiveMaintenance) {
             Facility facility = facilityOpt.get();
@@ -633,17 +638,28 @@ public class MaintenanceController {
             return;
         }
 
-        if (maintenance.getStartTime() != null) {
-            LocalDateTime now = LocalDateTime.now();
-            LocalDateTime switchTime = maintenance.getStartTime().minusMinutes(15);
-            if ((now.isAfter(switchTime) || now.isEqual(switchTime))
-                    && !"COMPLETED".equals(newStatus)
-                    && !"CANCELLED".equals(newStatus)) {
-                if (!"MAINTENANCE".equals(facility.getStatus())) {
-                    facility.setStatus("MAINTENANCE");
-                    facilityRepository.save(facility);
-                }
-            }
+        if ("CANCELLED".equals(newStatus) && !"CANCELLED".equals(oldStatus)) {
+            restoreFacilityIfNeeded(maintenance.getFacilityId());
+            return;
         }
+
+        if ("PENDING".equals(newStatus) && "IN_PROGRESS".equals(oldStatus)) {
+            restoreFacilityIfNeeded(maintenance.getFacilityId());
+        }
+    }
+
+    private boolean isMaintenanceOccupyingFacility(Maintenance maintenance, LocalDateTime now) {
+        if (maintenance == null) {
+            return false;
+        }
+
+        String status = maintenance.getStatus();
+        if ("IN_PROGRESS".equals(status)) {
+            return true;
+        }
+
+        return "PENDING".equals(status)
+                && maintenance.getStartTime() != null
+                && !maintenance.getStartTime().isAfter(now);
     }
 }
