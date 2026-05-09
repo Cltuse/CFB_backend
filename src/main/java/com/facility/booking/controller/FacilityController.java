@@ -1,4 +1,4 @@
-﻿package com.facility.booking.controller;
+package com.facility.booking.controller;
 
 import com.facility.booking.annotation.OperationLog;
 import com.facility.booking.common.Result;
@@ -73,7 +73,7 @@ public class FacilityController {
     public Result<List<Facility>> mine() {
         Long currentUserId = currentUserService.getCurrentUserId();
         if (currentUserId == null || !currentUserService.hasRole("MAINTAINER")) {
-            return Result.error(403, "浠呰鏂界鐞嗗憳鍙煡鐪嬭嚜宸辫礋璐ｇ殑璁炬柦");
+            return Result.error(403, "仅设施管理员可查看自己负责的设施");
         }
 
         List<Facility> facilities = facilityRepository.findByMaintainerId(currentUserId);
@@ -86,7 +86,7 @@ public class FacilityController {
         if (currentUserService.hasRole("MAINTAINER")) {
             Long currentUserId = currentUserService.getCurrentUserId();
             if (!Objects.equals(currentUserId, maintainerId)) {
-                return Result.error(403, "鏃犳潈鏌ョ湅鍏朵粬璁炬柦绠＄悊鍛樿礋璐ｇ殑璁炬柦");
+                return Result.error(403, "无权查看其他设施管理员负责的设施");
             }
         }
 
@@ -106,10 +106,10 @@ public class FacilityController {
     public Result<Facility> getById(@PathVariable Long id) {
         Optional<Facility> facilityOpt = facilityRepository.findById(id);
         if (facilityOpt.isEmpty()) {
-            return Result.error("璁炬柦涓嶅瓨鍦?);
+            return Result.error("设施不存在");
         }
         if (!canCurrentMaintainerAccessFacility(facilityOpt.get())) {
-            return Result.error(403, "鏃犳潈鏌ョ湅璇ヨ鏂?);
+            return Result.error(403, "无权查看该设施");
         }
 
         Facility facility = facilityOpt.get();
@@ -124,12 +124,12 @@ public class FacilityController {
     ) {
         Optional<Facility> facilityOpt = facilityRepository.findById(id);
         if (facilityOpt.isEmpty()) {
-            return Result.error("璁炬柦涓嶅瓨鍦?);
+            return Result.error("设施不存在");
         }
 
         Facility facility = facilityOpt.get();
         if (!canCurrentMaintainerAccessFacility(facility)) {
-            return Result.error(403, "鏃犳潈鏌ョ湅璇ヨ鏂?);
+            return Result.error(403, "无权查看该设施");
         }
 
         enrichFacility(facility);
@@ -144,8 +144,8 @@ public class FacilityController {
                                 .collect(Collectors.toSet()))
                 .stream()
                 .collect(Collectors.toMap(User::getId, user -> user));
-        List<Map<String, Object>> timeline = new ArrayList<>();
 
+        List<Map<String, Object>> timeline = new ArrayList<>();
         for (Reservation reservation : reservations) {
             if (!reservation.getEndTime().isAfter(now) || !reservation.getStartTime().isBefore(endDate)) {
                 continue;
@@ -161,7 +161,7 @@ public class FacilityController {
             reservationInfo.put("status", reservation.getStatus());
             reservationInfo.put("purpose", reservation.getPurpose());
             User user = usersById.get(reservation.getUserId());
-            reservationInfo.put("userName", user != null ? getDisplayName(user) : "鏈煡鐢ㄦ埛");
+            reservationInfo.put("userName", user != null ? getDisplayName(user) : "未知用户");
             timeline.add(reservationInfo);
         }
 
@@ -234,10 +234,10 @@ public class FacilityController {
     }
 
     @PostMapping
-    @OperationLog(operationType = "CREATE_FACILITY", detail = "鍒涘缓璁炬柦")
+    @OperationLog(operationType = "CREATE_FACILITY", detail = "创建设施")
     public Result<Facility> create(@RequestBody Facility facility) {
         if (!currentUserService.hasRole("ADMIN") && !currentUserService.hasRole("MAINTAINER")) {
-            return Result.error(403, "浠呯郴缁熺鐞嗗憳鍙垱寤鸿鏂?);
+            return Result.error(403, "仅系统管理员和设施管理员可创建设施");
         }
 
         String validationError = validateMaintainerBinding(facility.getMaintainerId());
@@ -251,17 +251,17 @@ public class FacilityController {
 
         Facility savedFacility = facilityRepository.save(facility);
         enrichFacility(savedFacility);
-        return Result.success("鍒涘缓鎴愬姛", savedFacility);
+        return Result.success("创建成功", savedFacility);
     }
 
     @PostMapping(consumes = "multipart/form-data")
-    @OperationLog(operationType = "CREATE_FACILITY", detail = "鍒涘缓璁炬柦")
+    @OperationLog(operationType = "CREATE_FACILITY", detail = "创建设施")
     public Result<Facility> createWithImage(
             @RequestPart("facility") Facility facility,
             @RequestPart(value = "image", required = false) MultipartFile imageFile
     ) {
         if (!currentUserService.hasRole("ADMIN")) {
-            return Result.error(403, "浠呯郴缁熺鐞嗗憳鍙垱寤鸿鏂?);
+            return Result.error(403, "仅系统管理员可创建设施");
         }
 
         String validationError = validateMaintainerBinding(facility.getMaintainerId());
@@ -272,7 +272,7 @@ public class FacilityController {
         try {
             if (imageFile != null && !imageFile.isEmpty()) {
                 if (!fileUploadService.isValidImageFile(imageFile)) {
-                    return Result.error("鍙兘涓婁紶鍥剧墖鏂囦欢");
+                    return Result.error("只能上传图片文件");
                 }
                 facility.setImageUrl(fileUploadService.uploadFile(imageFile, "facility"));
             } else {
@@ -281,27 +281,27 @@ public class FacilityController {
 
             Facility savedFacility = facilityRepository.save(facility);
             enrichFacility(savedFacility);
-            return Result.success("鍒涘缓鎴愬姛", savedFacility);
+            return Result.success("创建成功", savedFacility);
         } catch (Exception e) {
-            return Result.error("鍒涘缓澶辫触: " + e.getMessage());
+            return Result.error("创建失败: " + e.getMessage());
         }
     }
 
     @PostMapping("/{id}/image")
-    @OperationLog(operationType = "UPLOAD_FACILITY_IMAGE", detail = "涓婁紶璁炬柦鍥剧墖")
+    @OperationLog(operationType = "UPLOAD_FACILITY_IMAGE", detail = "上传设施图片")
     public Result<Facility> uploadImage(@PathVariable Long id, @RequestParam("file") MultipartFile file) {
         if (!currentUserService.hasRole("ADMIN")) {
-            return Result.error(403, "浠呯郴缁熺鐞嗗憳鍙笂浼犺鏂藉浘鐗?);
+            return Result.error(403, "仅系统管理员可上传设施图片");
         }
 
         Optional<Facility> facilityOpt = facilityRepository.findById(id);
         if (facilityOpt.isEmpty()) {
-            return Result.error("璁炬柦涓嶅瓨鍦?);
+            return Result.error("设施不存在");
         }
 
         try {
             if (!fileUploadService.isValidImageFile(file)) {
-                return Result.error("鍙兘涓婁紶鍥剧墖鏂囦欢");
+                return Result.error("只能上传图片文件");
             }
 
             Facility facility = facilityOpt.get();
@@ -312,22 +312,22 @@ public class FacilityController {
             facility.setImageUrl(fileUploadService.uploadFile(file, "facility"));
             Facility savedFacility = facilityRepository.save(facility);
             enrichFacility(savedFacility);
-            return Result.success("鍥剧墖涓婁紶鎴愬姛", savedFacility);
+            return Result.success("图片上传成功", savedFacility);
         } catch (Exception e) {
-            return Result.error("鍥剧墖涓婁紶澶辫触: " + e.getMessage());
+            return Result.error("图片上传失败: " + e.getMessage());
         }
     }
 
     @DeleteMapping("/{id}/image")
-    @OperationLog(operationType = "DELETE_FACILITY_IMAGE", detail = "鍒犻櫎璁炬柦鍥剧墖")
+    @OperationLog(operationType = "DELETE_FACILITY_IMAGE", detail = "删除设施图片")
     public Result<Facility> deleteImage(@PathVariable Long id) {
         if (!currentUserService.hasRole("ADMIN")) {
-            return Result.error(403, "浠呯郴缁熺鐞嗗憳鍙垹闄よ鏂藉浘鐗?);
+            return Result.error(403, "仅系统管理员可删除设施图片");
         }
 
         Optional<Facility> facilityOpt = facilityRepository.findById(id);
         if (facilityOpt.isEmpty()) {
-            return Result.error("璁炬柦涓嶅瓨鍦?);
+            return Result.error("设施不存在");
         }
 
         Facility facility = facilityOpt.get();
@@ -338,19 +338,19 @@ public class FacilityController {
 
         Facility savedFacility = facilityRepository.save(facility);
         enrichFacility(savedFacility);
-        return Result.success("鍥剧墖鍒犻櫎鎴愬姛", savedFacility);
+        return Result.success("图片删除成功", savedFacility);
     }
 
     @PutMapping("/{id}")
-    @OperationLog(operationType = "UPDATE_FACILITY", detail = "鏇存柊璁炬柦")
+    @OperationLog(operationType = "UPDATE_FACILITY", detail = "更新设施")
     public Result<Facility> update(@PathVariable Long id, @RequestBody Facility facility) {
         if (!currentUserService.hasRole("ADMIN")) {
-            return Result.error(403, "浠呯郴缁熺鐞嗗憳鍙紪杈戣鏂?);
+            return Result.error(403, "仅系统管理员可编辑设施");
         }
 
         Optional<Facility> facilityOpt = facilityRepository.findById(id);
         if (facilityOpt.isEmpty()) {
-            return Result.error("璁炬柦涓嶅瓨鍦?);
+            return Result.error("设施不存在");
         }
 
         String validationError = validateMaintainerBinding(facility.getMaintainerId());
@@ -392,46 +392,46 @@ public class FacilityController {
 
         Facility savedFacility = facilityRepository.save(existingFacility);
         enrichFacility(savedFacility);
-        return Result.success("鏇存柊鎴愬姛", savedFacility);
+        return Result.success("更新成功", savedFacility);
     }
 
     @PutMapping("/{id}/status")
-    @OperationLog(operationType = "UPDATE_FACILITY_STATUS", detail = "鏇存柊璁炬柦鐘舵€?)
+    @OperationLog(operationType = "UPDATE_FACILITY_STATUS", detail = "更新设施状态")
     public Result<Facility> updateStatus(@PathVariable Long id, @RequestBody Map<String, String> requestBody) {
         Optional<Facility> facilityOpt = facilityRepository.findById(id);
         if (facilityOpt.isEmpty()) {
-            return Result.error("璁炬柦涓嶅瓨鍦?);
+            return Result.error("设施不存在");
         }
 
         Facility facility = facilityOpt.get();
         if (currentUserService.hasRole("MAINTAINER") && !canCurrentMaintainerAccessFacility(facility)) {
-            return Result.error(403, "鏃犳潈鏇存柊璇ヨ鏂界姸鎬?);
+            return Result.error(403, "无权更新该设施状态");
         }
         if (!currentUserService.hasRole("ADMIN") && !currentUserService.hasRole("MAINTAINER")) {
-            return Result.error(403, "鏃犳潈鏇存柊璁炬柦鐘舵€?);
+            return Result.error(403, "无权更新设施状态");
         }
 
         String status = requestBody.get("status");
         if (status == null || status.trim().isEmpty()) {
-            return Result.error("鐘舵€佷笉鑳戒负绌?);
+            return Result.error("状态不能为空");
         }
 
         facility.setStatus(status.trim().toUpperCase());
         Facility savedFacility = facilityRepository.save(facility);
         enrichFacility(savedFacility);
-        return Result.success("璁炬柦鐘舵€佹洿鏂版垚鍔?, savedFacility);
+        return Result.success("设施状态更新成功", savedFacility);
     }
 
     @DeleteMapping("/{id}")
-    @OperationLog(operationType = "DELETE_FACILITY", detail = "鍒犻櫎璁炬柦")
+    @OperationLog(operationType = "DELETE_FACILITY", detail = "删除设施")
     public Result<Void> delete(@PathVariable Long id) {
         if (!currentUserService.hasRole("ADMIN") && !currentUserService.hasRole("MAINTAINER")) {
-            return Result.error(403, "浠呯郴缁熺鐞嗗憳鍜岃鏂界鐞嗗憳鍙垹闄よ鏂?);
+            return Result.error(403, "仅系统管理员和设施管理员可删除设施");
         }
 
         Optional<Facility> facilityOpt = facilityRepository.findById(id);
         if (facilityOpt.isEmpty()) {
-            return Result.error("璁炬柦涓嶅瓨鍦?);
+            return Result.error("设施不存在");
         }
 
         Facility facility = facilityOpt.get();
@@ -443,7 +443,7 @@ public class FacilityController {
         }
 
         facilityRepository.deleteById(id);
-        return Result.success("鍒犻櫎鎴愬姛", null);
+        return Result.success("删除成功", null);
     }
 
     private Map<String, Object> toPageResult(Page<Facility> facilityPage, List<Facility> facilities) {
@@ -488,10 +488,10 @@ public class FacilityController {
 
         Optional<User> userOpt = userRepository.findById(maintainerId);
         if (userOpt.isEmpty()) {
-            return "鎵€閫夎鏂借礋璐ｄ汉涓嶅瓨鍦?;
+            return "所选设施负责人不存在";
         }
         if (!"MAINTAINER".equals(userOpt.get().getRole())) {
-            return "璁炬柦璐熻矗浜哄繀椤绘槸璁炬柦绠＄悊鍛樿鑹?;
+            return "设施负责人必须是设施管理员角色";
         }
         return null;
     }
