@@ -24,6 +24,8 @@ import java.util.UUID;
 public class ReservationService {
 
     private static final List<String> CONFLICT_STATUSES = Arrays.asList("APPROVED", "PENDING", "COMPLETED");
+    private static final List<String> ACTIVE_LIMIT_STATUSES = Arrays.asList("PENDING", "APPROVED");
+    private static final List<String> DAILY_LIMIT_EXCLUDED_STATUSES = Arrays.asList("REJECTED", "CANCELLED");
 
     private final ReservationRepository reservationRepository;
     private final FacilityRepository facilityRepository;
@@ -296,11 +298,14 @@ public class ReservationService {
 
         if (ruleConfig.getMaxBookingsPerDay() != null) {
             LocalDate reservationDate = startTime.toLocalDate();
-            long dailyCount = reservationRepository.findByUserId(reservation.getUserId()).stream()
-                    .filter(r -> excludeReservationId == null || !excludeReservationId.equals(r.getId()))
-                    .filter(r -> r.getStartTime().toLocalDate().equals(reservationDate))
-                    .filter(r -> !("REJECTED".equals(r.getStatus()) || "CANCELLED".equals(r.getStatus())))
-                    .count();
+            long dailyCount = reservationRepository.countCategoryReservationsForDay(
+                    reservation.getUserId(),
+                    facility.getCategory(),
+                    reservationDate.atStartOfDay(),
+                    reservationDate.plusDays(1).atStartOfDay(),
+                    DAILY_LIMIT_EXCLUDED_STATUSES,
+                    excludeReservationId
+            );
 
             if (dailyCount >= ruleConfig.getMaxBookingsPerDay()) {
                 return "当前类别设施当日预约次数已达上限（" + ruleConfig.getMaxBookingsPerDay() + "次），无法进行预约";
@@ -308,13 +313,13 @@ public class ReservationService {
         }
 
         if (ruleConfig.getMaxActiveBookings() != null) {
-            List<Reservation> userActiveReservations = reservationRepository.findByUserIdAndStatusIn(
+            long activeCount = reservationRepository.countCategoryActiveReservations(
                     reservation.getUserId(),
-                    Arrays.asList("PENDING", "APPROVED")
+                    facility.getCategory(),
+                    ACTIVE_LIMIT_STATUSES,
+                    now,
+                    excludeReservationId
             );
-            long activeCount = userActiveReservations.stream()
-                    .filter(r -> excludeReservationId == null || !excludeReservationId.equals(r.getId()))
-                    .count();
             if (activeCount >= ruleConfig.getMaxActiveBookings()) {
                 return "当前类别设施预约数已达上限（" + ruleConfig.getMaxActiveBookings() + "个），无法进行预约";
             }

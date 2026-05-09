@@ -95,6 +95,44 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     List<Reservation> findByUserIdAndStatusIn(@Param("userId") Long userId,
                                               @Param("statuses") List<String> statuses);
 
+    @Query("""
+            SELECT COUNT(r) FROM Reservation r
+            WHERE r.userId = :userId
+              AND r.startTime >= :dayStart
+              AND r.startTime < :dayEnd
+              AND r.status NOT IN :excludedStatuses
+              AND (:excludeReservationId IS NULL OR r.id <> :excludeReservationId)
+              AND EXISTS (
+                    SELECT f.id FROM Facility f
+                    WHERE f.id = r.facilityId
+                      AND ((:category IS NULL AND f.category IS NULL) OR f.category = :category)
+              )
+            """)
+    long countCategoryReservationsForDay(@Param("userId") Long userId,
+                                         @Param("category") String category,
+                                         @Param("dayStart") LocalDateTime dayStart,
+                                         @Param("dayEnd") LocalDateTime dayEnd,
+                                         @Param("excludedStatuses") List<String> excludedStatuses,
+                                         @Param("excludeReservationId") Long excludeReservationId);
+
+    @Query("""
+            SELECT COUNT(r) FROM Reservation r
+            WHERE r.userId = :userId
+              AND r.status IN :statuses
+              AND r.endTime > :referenceTime
+              AND (:excludeReservationId IS NULL OR r.id <> :excludeReservationId)
+              AND EXISTS (
+                    SELECT f.id FROM Facility f
+                    WHERE f.id = r.facilityId
+                      AND ((:category IS NULL AND f.category IS NULL) OR f.category = :category)
+              )
+            """)
+    long countCategoryActiveReservations(@Param("userId") Long userId,
+                                         @Param("category") String category,
+                                         @Param("statuses") List<String> statuses,
+                                         @Param("referenceTime") LocalDateTime referenceTime,
+                                         @Param("excludeReservationId") Long excludeReservationId);
+
     @Query("SELECT r FROM Reservation r WHERE r.verificationCode = :verificationCode")
     Optional<Reservation> findByVerificationCode(@Param("verificationCode") String verificationCode);
 
