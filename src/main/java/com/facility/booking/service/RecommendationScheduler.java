@@ -26,7 +26,7 @@ public class RecommendationScheduler {
     private NoticeRepository noticeRepository;
 
     /**
-     * 每天凌晨2点更新用户相似度矩阵
+     * 每天凌晨 2 点更新用户相似度矩阵
      */
     @Scheduled(cron = "0 0 2 * * ?")
     public void updateUserSimilarities() {
@@ -40,7 +40,7 @@ public class RecommendationScheduler {
     }
 
     /**
-     * 每天凌晨3点更新设施热度评分
+     * 每天凌晨 3 点更新设施热度评分
      */
     @Scheduled(cron = "0 0 3 * * ?")
     public void updateHotScores() {
@@ -68,7 +68,7 @@ public class RecommendationScheduler {
     }
 
     /**
-     * 每天凌晨4点为所有用户生成推荐
+     * 每天凌晨 4 点为所有用户生成推荐
      */
     @Scheduled(cron = "0 0 4 * * ?")
     public void generateRecommendations() {
@@ -89,7 +89,7 @@ public class RecommendationScheduler {
     }
 
     /**
-     * 每隔5分钟检查并发布已到时的定时通知
+     * 每隔 5 分钟检查并发布已到时的定时通知
      */
     @Transactional
     @Scheduled(fixedRate = 5 * 60 * 1000)
@@ -97,7 +97,7 @@ public class RecommendationScheduler {
         try {
             int count = noticeRepository.publishScheduledNotices(java.time.LocalDateTime.now());
             if (count > 0) {
-                logger.info("定时发布{}条通知成功", count);
+                logger.info("定时发布 {} 条通知成功", count);
             }
         } catch (Exception e) {
             logger.error("定时发布通知失败", e);
