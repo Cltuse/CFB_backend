@@ -30,6 +30,7 @@ E:\Stdio\JetBrains\Intellij\Programs\Java\Thesis\Compus_Facilities_Booking\backe
 E:\Stdio\JetBrains\Intellij\Programs\Java\Thesis\Compus_Facilities_Booking\backend\src\main\java\com\facility\booking\entity\UserRecommendation.java
 E:\Stdio\JetBrains\Intellij\Programs\Java\Thesis\Compus_Facilities_Booking\backend\src\main\java\com\facility\booking\service\BlacklistService.java
 E:\Stdio\JetBrains\Intellij\Programs\Java\Thesis\Compus_Facilities_Booking\backend\src\main\java\com\facility\booking\repository\CityCodeRepository.java
+E:\Stdio\JetBrains\Intellij\Programs\Java\Thesis\Compus_Facilities_Booking\backend\src\main\java\com\facility\booking\util\WeatherTypeUtils.java
 E:\Stdio\JetBrains\Intellij\Programs\Java\Thesis\Compus_Facilities_Booking\backend\src\main\java\com\facility\booking\dto\user\AdminUserUpdateRequest.java
 E:\Stdio\JetBrains\Intellij\Programs\Java\Thesis\Compus_Facilities_Booking\backend\src\main\java\com\facility\booking\entity\FacilityCategory.java
 E:\Stdio\JetBrains\Intellij\Programs\Java\Thesis\Compus_Facilities_Booking\backend\src\main\java\com\facility\booking\entity\UserFacilityBehavior.java

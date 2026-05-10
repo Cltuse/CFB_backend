@@ -4,6 +4,7 @@ import com.facility.booking.entity.CityCode;
 import com.facility.booking.entity.Weather;
 import com.facility.booking.repository.CityCodeRepository;
 import com.facility.booking.repository.WeatherQuoteRepository;
+import com.facility.booking.util.WeatherTypeUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
@@ -18,6 +19,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
@@ -25,10 +27,24 @@ import java.util.Set;
 @Service
 public class WeatherService {
 
-    private static final String DEFAULT_CITY = "北京";
-    private static final String DEFAULT_CITY_CODE = "101010100";
+    private static final String DEFAULT_CITY = "重庆市";
+    private static final String DEFAULT_CITY_CODE = "101040100";
     private static final DateTimeFormatter UPDATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private static final Random RANDOM = new Random();
+    private static final Map<String, String> BUILTIN_CITY_CODES = Map.ofEntries(
+            Map.entry("重庆", "101040100"),
+            Map.entry("重庆市", "101040100"),
+            Map.entry("北京", "101010100"),
+            Map.entry("北京市", "101010100"),
+            Map.entry("上海", "101020100"),
+            Map.entry("上海市", "101020100"),
+            Map.entry("广州", "101280101"),
+            Map.entry("广州市", "101280101"),
+            Map.entry("深圳", "101280601"),
+            Map.entry("深圳市", "101280601"),
+            Map.entry("杭州", "101210101"),
+            Map.entry("杭州市", "101210101")
+    );
 
     @Value("${weather.api.base-url}")
     private String weatherApiBaseUrl;
@@ -73,7 +89,7 @@ public class WeatherService {
         try {
             locationInfo = ipLocationService.getLocationInfoByIp(clientIp);
         } catch (Exception exception) {
-            locationInfo = new IpLocationService.LocationInfo(clientIp, DEFAULT_CITY, "IP 归属地暂时无法获取");
+            locationInfo = new IpLocationService.LocationInfo(clientIp, DEFAULT_CITY, "IP归属地暂时无法获取，已回退重庆市");
         }
 
         String resolvedCity = normalizeCityName(locationInfo.city());
@@ -110,13 +126,13 @@ public class WeatherService {
             }
 
             String rawWeatherType = extractWeatherType(dataNode);
-            String normalizedWeatherType = normalizeWeatherType(rawWeatherType);
+            String normalizedWeatherType = WeatherTypeUtils.normalizeWeatherType(rawWeatherType);
 
             Weather weather = new Weather();
             weather.setCity(extractDisplayCity(root, city));
             weather.setWeatherType(hasText(rawWeatherType) ? rawWeatherType : normalizedWeatherType);
             weather.setTemperature(extractTemperature(dataNode));
-            weather.setWeatherIcon(weatherIconService.getWeatherIconPath(rawWeatherType));
+            weather.setWeatherIcon(weatherIconService.getWeatherIconPath(hasText(rawWeatherType) ? rawWeatherType : normalizedWeatherType));
             weather.setMoodQuote(resolveMoodQuote(rawWeatherType, normalizedWeatherType));
             weather.setUpdateTime(extractUpdateTime(root));
             return weather;
@@ -126,6 +142,13 @@ public class WeatherService {
     }
 
     private Optional<String> resolveCityCode(String city) {
+        for (String candidate : buildCityCandidates(city)) {
+            String builtinCode = BUILTIN_CITY_CODES.get(candidate);
+            if (hasText(builtinCode)) {
+                return Optional.of(builtinCode);
+            }
+        }
+
         for (String candidate : buildCityCandidates(city)) {
             Optional<CityCode> exactMatch = cityCodeRepository.findByName(candidate);
             if (exactMatch.isPresent()) {
@@ -148,16 +171,18 @@ public class WeatherService {
         String normalized = normalizeCityName(city);
         if (!hasText(normalized)) {
             candidates.add(DEFAULT_CITY);
+            candidates.add(removeSuffix(DEFAULT_CITY, "市"));
             return candidates;
         }
 
+        candidates.add(city);
         candidates.add(normalized);
         candidates.add(removeSuffix(normalized, "市"));
         candidates.add(removeSuffix(normalized, "地区"));
         candidates.add(removeSuffix(normalized, "盟"));
         candidates.add(removeSuffix(normalized, "自治州"));
         candidates.add(removeSuffix(normalized, "特别行政区"));
-        candidates.add(removeSuffix(normalized, "自治县"));
+        candidates.add(removeSuffix(normalized, "自治区"));
         candidates.add(removeSuffix(normalized, "县"));
         candidates.add(removeSuffix(normalized, "区"));
         candidates.removeIf(candidate -> !hasText(candidate));
@@ -208,7 +233,7 @@ public class WeatherService {
             }
         }
 
-        return "";
+        return WeatherTypeUtils.UNKNOWN;
     }
 
     private String extractTemperature(JsonNode dataNode) {
@@ -221,7 +246,7 @@ public class WeatherService {
         if (forecastNode.isArray() && !forecastNode.isEmpty()) {
             String high = forecastNode.get(0).path("high").asText("");
             if (hasText(high)) {
-                String numeric = high.replaceAll("[^0-9-]", "");
+                String numeric = high.replaceAll("[^0-9.-]", "");
                 if (hasText(numeric)) {
                     return numeric + "℃";
                 }
@@ -265,32 +290,32 @@ public class WeatherService {
     private List<String> getFallbackQuotes(String normalizedWeatherType) {
         return switch (normalizedWeatherType) {
             case "晴" -> List.of(
-                    "天气晴朗，适合安排今天的学习和预约计划。",
-                    "阳光不错，保持节奏，今天的事情会推进得更顺。"
+                    "天气晴朗，适合把今天的学习和预约安排得更从容。",
+                    "阳光在线，今天也适合高效推进手头事项。"
             );
             case "多云", "阴" -> List.of(
-                    "云层较多，适合稳稳推进今天的安排。",
-                    "天气偏柔和，按计划处理事项会更高效。"
+                    "天气平稳，按计划处理今天的事情会更顺手。",
+                    "云层稍厚，但节奏不用乱，照常推进就好。"
             );
             case "小雨", "中雨", "大雨", "暴雨", "阵雨", "雷阵雨", "雷雨", "冻雨" -> List.of(
-                    "出门记得带伞，预约结束后也注意路上安全。",
-                    "雨天更适合把安排做细一点，行程会更从容。"
+                    "雨天出行记得预留时间，预约结束后也注意路上安全。",
+                    "天气偏湿，今天更适合把安排做细一点。"
             );
             case "小雪", "中雪", "大雪", "暴雪", "阵雪", "雨夹雪" -> List.of(
-                    "天气较冷，外出前注意保暖和出行时间。",
-                    "雪天路滑，预约和返程都尽量预留缓冲时间。"
+                    "天气较冷，外出前记得保暖，行程也尽量留出缓冲。",
+                    "雪天路滑，按部就班比赶时间更重要。"
             );
             case "雾", "雾霾", "扬沙", "浮尘", "沙尘暴", "强沙尘暴" -> List.of(
-                    "能见度一般，尽量提前出发，避免赶时间。",
+                    "能见度一般，今天外出和预约都建议更早一点出发。",
                     "当前天气对出行有影响，安排路线时多留一点余量。"
             );
             case "大风", "台风" -> List.of(
-                    "风力较大，外出注意安全，尽量减少不必要停留。",
-                    "天气变化明显，今天的安排更适合留出机动时间。"
+                    "风力较大，外出时注意安全，尽量减少不必要停留。",
+                    "天气变化明显，今天的安排更适合预留机动时间。"
             );
             default -> List.of(
-                    "天气信息已更新，按节奏推进今天的学习和预约即可。",
-                    "当前天气已同步，合理安排时间会更高效。"
+                    "天气信息已同步，按节奏推进今天的学习和预约即可。",
+                    "当前天气已更新，合理安排时间会更高效。"
             );
         };
     }
@@ -298,110 +323,12 @@ public class WeatherService {
     private Weather buildStableFallbackWeather(String city) {
         Weather weather = new Weather();
         weather.setCity(hasText(city) ? city : DEFAULT_CITY);
-        weather.setWeatherType("未知");
+        weather.setWeatherType(WeatherTypeUtils.UNKNOWN);
         weather.setTemperature("--");
-        weather.setWeatherIcon(weatherIconService.getWeatherIconPath("未知"));
+        weather.setWeatherIcon(weatherIconService.getWeatherIconPath(WeatherTypeUtils.UNKNOWN));
         weather.setMoodQuote("天气服务暂时不可用，请稍后刷新重试。");
         weather.setUpdateTime(LocalDateTime.now().format(UPDATE_TIME_FORMATTER));
         return weather;
-    }
-
-    private String normalizeWeatherType(String weatherType) {
-        if (!hasText(weatherType)) {
-            return "未知";
-        }
-
-        String value = weatherType.trim().replace(" ", "");
-
-        if (value.contains("雷阵雨伴有冰雹")) {
-            return "雷阵雨伴有冰雹";
-        }
-        if (value.contains("强沙尘暴")) {
-            return "强沙尘暴";
-        }
-        if (value.contains("沙尘暴")) {
-            return "沙尘暴";
-        }
-        if (value.contains("大暴雨")) {
-            return "大暴雨";
-        }
-        if (value.contains("暴雪")) {
-            return "暴雪";
-        }
-        if (value.contains("暴雨")) {
-            return "暴雨";
-        }
-        if (value.contains("雷阵雨")) {
-            return "雷阵雨";
-        }
-        if (value.contains("雷雨")) {
-            return "雷雨";
-        }
-        if (value.contains("雨夹雪")) {
-            return "雨夹雪";
-        }
-        if (value.contains("冻雨")) {
-            return "冻雨";
-        }
-        if (value.contains("阵雪")) {
-            return "阵雪";
-        }
-        if (value.contains("阵雨")) {
-            return "阵雨";
-        }
-        if (value.contains("中雪")) {
-            return "中雪";
-        }
-        if (value.contains("大雪")) {
-            return "大雪";
-        }
-        if (value.contains("小雪")) {
-            return "小雪";
-        }
-        if (value.contains("中雨")) {
-            return "中雨";
-        }
-        if (value.contains("大雨")) {
-            return "大雨";
-        }
-        if (value.contains("小雨")) {
-            return "小雨";
-        }
-        if (value.contains("冰雹")) {
-            return "冰雹";
-        }
-        if (value.contains("雾霾")) {
-            return "雾霾";
-        }
-        if (value.contains("雾")) {
-            return "雾";
-        }
-        if (value.contains("霜")) {
-            return "霜";
-        }
-        if (value.contains("扬沙")) {
-            return "扬沙";
-        }
-        if (value.contains("浮尘")) {
-            return "浮尘";
-        }
-        if (value.contains("大风")) {
-            return "大风";
-        }
-        if (value.contains("台风")) {
-            return "台风";
-        }
-        if (value.contains("多云")) {
-            return "多云";
-        }
-        if (value.contains("阴")) {
-            return "阴";
-        }
-        if (value.contains("晴")) {
-            return "晴";
-        }
-
-        return "未知";
     }
 
     private String removeSuffix(String value, String suffix) {
