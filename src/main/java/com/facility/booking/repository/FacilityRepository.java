@@ -1,11 +1,9 @@
 package com.facility.booking.repository;
 
 import com.facility.booking.entity.Facility;
-import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -59,7 +57,6 @@ public interface FacilityRepository extends JpaRepository<Facility, Long> {
        Page<Facility> findByCategory(String category, Pageable pageable);
 
        // 分页查询所有设施
-       @Lock(LockModeType.PESSIMISTIC_WRITE)
-       @Query("SELECT f FROM Facility f WHERE f.id = :id")
+       @Query(value = "SELECT * FROM facility WHERE id = :id FOR UPDATE", nativeQuery = true)
        Optional<Facility> findByIdWithLock(@Param("id") Long id);
 }

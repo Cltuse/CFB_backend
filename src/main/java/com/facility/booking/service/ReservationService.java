@@ -9,8 +9,8 @@ import com.facility.booking.repository.FacilityRepository;
 import com.facility.booking.repository.ReservationRepository;
 import com.facility.booking.repository.RuleConfigRepository;
 import com.facility.booking.repository.UserRepository;
-import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;

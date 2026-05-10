@@ -155,6 +155,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
         @Query("SELECT r FROM Reservation r WHERE r.verificationCode = :verificationCode")
         Optional<Reservation> findByVerificationCode(@Param("verificationCode") String verificationCode);
 
+        // 根据设施ID查询冲突的预约
         @Query("SELECT r FROM Reservation r WHERE r.facilityId = :facilityId " +
                         "AND r.status IN :statuses " +
                         "AND ((r.startTime < :endTime AND r.endTime > :startTime))")
