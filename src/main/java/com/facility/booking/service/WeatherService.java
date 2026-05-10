@@ -27,13 +27,13 @@ import java.util.Set;
 @Service
 public class WeatherService {
 
-    private static final String DEFAULT_CITY = "重庆市";
-    private static final String DEFAULT_CITY_CODE = "101040100";
+    private static final String DEFAULT_CITY = "合川区";
+    private static final String DEFAULT_CITY_CODE = "101040300";
     private static final DateTimeFormatter UPDATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private static final Random RANDOM = new Random();
     private static final Map<String, String> BUILTIN_CITY_CODES = Map.ofEntries(
-            Map.entry("重庆", "101040100"),
-            Map.entry("重庆市", "101040100"),
+            Map.entry("合川", "101040300"),
+            Map.entry("合川区", "101040300"),
             Map.entry("北京", "101010100"),
             Map.entry("北京市", "101010100"),
             Map.entry("上海", "101020100"),
@@ -89,7 +89,7 @@ public class WeatherService {
         try {
             locationInfo = ipLocationService.getLocationInfoByIp(clientIp);
         } catch (Exception exception) {
-            locationInfo = new IpLocationService.LocationInfo(clientIp, DEFAULT_CITY, "IP归属地暂时无法获取，已回退重庆市");
+            locationInfo = new IpLocationService.LocationInfo(clientIp, DEFAULT_CITY, "IP归属地暂时无法获取，已回退合川区");
         }
 
         String resolvedCity = normalizeCityName(locationInfo.city());

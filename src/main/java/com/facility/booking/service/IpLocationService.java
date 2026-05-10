@@ -17,9 +17,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class IpLocationService {
 
-    private static final String DEFAULT_CITY = "重庆市";
-    private static final String LOCAL_REGION_ADDRESS = "本机访问 / 局域网环境，已回退重庆市";
-    private static final String DEFAULT_REGION_ADDRESS = "IP归属地暂时无法获取，已回退重庆市";
+    private static final String DEFAULT_CITY = "合川区";
+    private static final String LOCAL_REGION_ADDRESS = "本机访问 / 局域网环境，已回退合川区";
+    private static final String DEFAULT_REGION_ADDRESS = "IP归属地暂时无法获取，已回退合川区";
 
     public record LocationInfo(String ipAddress, String city, String regionAddress) {}
 
