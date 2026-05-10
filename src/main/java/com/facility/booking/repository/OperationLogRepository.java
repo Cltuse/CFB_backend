@@ -36,9 +36,19 @@ public interface OperationLogRepository extends JpaRepository<OperationLog, Long
                                        @Param("startTime") LocalDateTime startTime, 
                                        @Param("endTime") LocalDateTime endTime, 
                                        Pageable pageable);
+
+    @Query("SELECT o FROM OperationLog o WHERE (:operatorId IS NULL OR o.operatorId = :operatorId) AND " +
+           "(:operationType IS NULL OR o.operationType = :operationType) AND " +
+           "(o.createdAt BETWEEN :startTime AND :endTime) ORDER BY o.createdAt DESC")
+    List<OperationLog> findByConditions(@Param("operatorId") Long operatorId,
+                                        @Param("operationType") String operationType,
+                                        @Param("startTime") LocalDateTime startTime,
+                                        @Param("endTime") LocalDateTime endTime);
     
     // 查询所有操作日志，按创建时间倒序
     Page<OperationLog> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    List<OperationLog> findAllByOrderByCreatedAtDesc();
     
     // 根据目标ID查询相关操作日志
     List<OperationLog> findByTargetIdOrderByCreatedAtDesc(Long targetId);

@@ -185,6 +185,81 @@ public class AdminController {
         return Result.success(result);
     }
 
+    @GetMapping("/operation-logs/stats")
+    public Result<Map<String, Object>> getOperationLogStats(
+            @RequestParam(required = false) Long operatorId,
+            @RequestParam(required = false) String operationType,
+            @RequestParam(required = false) String startTime,
+            @RequestParam(required = false) String endTime) {
+
+        LocalDateTime start = null;
+        LocalDateTime end = null;
+
+        try {
+            if (startTime != null && !startTime.trim().isEmpty()) {
+                start = LocalDateTime.parse(startTime);
+            }
+            if (endTime != null && !endTime.trim().isEmpty()) {
+                end = LocalDateTime.parse(endTime);
+            }
+        } catch (Exception e) {
+            try {
+                if (startTime != null && !startTime.trim().isEmpty()) {
+                    start = LocalDateTime.parse(startTime.replace(" ", "T"));
+                }
+                if (endTime != null && !endTime.trim().isEmpty()) {
+                    end = LocalDateTime.parse(endTime.replace(" ", "T"));
+                }
+            } catch (Exception e2) {
+                return Result.error("鏃堕棿鏍煎紡閿欒锛岃浣跨敤ISO鏍煎紡锛坹yyy-MM-ddTHH:mm:ss锛夋垨锛坹yyy-MM-dd HH:mm:ss锛?);
+            }
+        }
+
+        boolean hasSearchCondition = operatorId != null ||
+                (operationType != null && !operationType.trim().isEmpty()) ||
+                start != null || end != null;
+
+        if (hasSearchCondition) {
+            if (start == null && end == null) {
+                start = LocalDateTime.of(2000, 1, 1, 0, 0);
+                end = LocalDateTime.of(2099, 12, 31, 23, 59, 59);
+            } else if (start == null) {
+                start = LocalDateTime.of(2000, 1, 1, 0, 0);
+            } else if (end == null) {
+                end = LocalDateTime.now();
+            }
+        }
+
+        List<com.facility.booking.entity.OperationLog> matchedLogs = hasSearchCondition
+                ? operationLogRepository.findByConditions(operatorId, operationType, start, end)
+                : operationLogRepository.findAllByOrderByCreatedAtDesc();
+
+        long riskOperationCount = matchedLogs.stream()
+                .filter(log -> {
+                    String type = log.getOperationType() == null ? "" : log.getOperationType();
+                    return type.contains("REJECT")
+                            || type.contains("DELETE")
+                            || type.contains("BLACKLIST")
+                            || type.contains("REMOVE_BLACKLIST")
+                            || type.contains("ADD_BLACKLIST")
+                            || type.contains("REVOKE");
+                })
+                .count();
+
+        long operationTypeCount = matchedLogs.stream()
+                .map(com.facility.booking.entity.OperationLog::getOperationType)
+                .filter(type -> type != null && !type.trim().isEmpty())
+                .distinct()
+                .count();
+
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("totalLogs", matchedLogs.size());
+        stats.put("riskCount", riskOperationCount);
+        stats.put("typeCount", operationTypeCount);
+
+        return Result.success(stats);
+    }
+
     /**
      * 将用户加入黑名单
      * 
