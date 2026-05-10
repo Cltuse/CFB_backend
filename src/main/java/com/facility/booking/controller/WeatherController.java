@@ -16,12 +16,17 @@ public class WeatherController {
     @Autowired
     private WeatherService weatherService;
 
+    /**
+     * 根据城市获取天气信息。
+     * 如果城市不存在，返回错误结果。
+     * 如果获取天气信息失败，返回错误结果。
+     */
     @GetMapping("/get")
     public Result<Weather> getWeather(@RequestParam(defaultValue = "北京") String city) {
         Weather weather = weatherService.getWeatherByCity(city);
         return Result.success("获取天气信息成功", weather);
     }
-    
+
     /**
      * 根据IP自动定位获取天气信息
      */

@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
+// 用户密码变更请求DTO
 public class ChangePasswordRequest {
     @NotBlank(message = "当前密码不能为空")
     private String currentPassword;

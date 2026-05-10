@@ -73,7 +73,8 @@ public class ReservationController {
      */
     @GetMapping("/user/{userId}")
     public Result<List<Reservation>> getByUserId(@PathVariable Long userId) {
-        List<Reservation> reservations = filterReservationsForCurrentMaintainer(reservationRepository.findByUserId(userId));
+        List<Reservation> reservations = filterReservationsForCurrentMaintainer(
+                reservationRepository.findByUserId(userId));
         enrichReservations(reservations);
         return Result.success(reservations);
     }
@@ -83,7 +84,8 @@ public class ReservationController {
      */
     @GetMapping("/pending")
     public Result<List<Reservation>> getPending() {
-        List<Reservation> reservations = filterReservationsForCurrentMaintainer(reservationRepository.findByStatus("PENDING"));
+        List<Reservation> reservations = filterReservationsForCurrentMaintainer(
+                reservationRepository.findByStatus("PENDING"));
         enrichReservations(reservations);
         return Result.success(reservations);
     }
@@ -620,11 +622,13 @@ public class ReservationController {
      */
     @GetMapping("/availability")
     public Result<Map<String, Object>> checkAvailability(@RequestParam Long facilityId,
-                                                         @RequestParam String startTime,
-                                                         @RequestParam String endTime) {
+            @RequestParam String startTime,
+            @RequestParam String endTime) {
         try {
-            LocalDateTime start = LocalDateTime.parse(startTime, java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-            LocalDateTime end = LocalDateTime.parse(endTime, java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            LocalDateTime start = LocalDateTime.parse(startTime,
+                    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            LocalDateTime end = LocalDateTime.parse(endTime,
+                    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 
             Optional<Facility> facilityOpt = facilityRepository.findById(facilityId);
             if (!facilityOpt.isPresent()) {
@@ -641,8 +645,7 @@ public class ReservationController {
 
             List<String> validStatuses = Arrays.asList("APPROVED", "PENDING", "COMPLETED");
             List<Reservation> conflictingReservations = reservationRepository.findConflictingReservations(
-                    facilityId, start, end, validStatuses
-            );
+                    facilityId, start, end, validStatuses);
 
             Map<String, Object> result = new HashMap<>();
             result.put("available", conflictingReservations.isEmpty());
@@ -701,6 +704,11 @@ public class ReservationController {
         }
     }
 
+    /**
+     * 获取预约时间范围统计数据
+     * 
+     * @return 预约时间范围统计数据
+     */
     @GetMapping("/stats/time-range")
     public Result<Map<String, Object>> getStatsByTimeRange(@RequestParam String range) {
         LocalDateTime startTime = getStartTimeByRange(range);
@@ -713,13 +721,19 @@ public class ReservationController {
         return Result.success(result);
     }
 
+    /**
+     * 获取预约分类统计数据
+     * 
+     * @return 预约分类统计数据
+     */
     @GetMapping("/stats/category")
     public Result<Map<String, Object>> getCategoryStats(@RequestParam(required = false) String range) {
         LocalDateTime startTime = range != null ? getStartTimeByRange(range) : LocalDateTime.of(2000, 1, 1, 0, 0);
-        List<ReservationRepository.CategoryCountView> categoryStats = reservationRepository.countCategoryStatsAfter(startTime);
+        List<ReservationRepository.CategoryCountView> categoryStats = reservationRepository
+                .countCategoryStatsAfter(startTime);
 
         List<Map<String, Object>> pieData = new ArrayList<>();
-        String[] colors = {"#409eff", "#67c23a", "#e6a23c", "#f56c6c", "#909399", "#c71585", "#00ced1", "#ff6347"};
+        String[] colors = { "#409eff", "#67c23a", "#e6a23c", "#f56c6c", "#909399", "#c71585", "#00ced1", "#ff6347" };
         int colorIndex = 0;
         long total = 0;
         for (ReservationRepository.CategoryCountView entry : categoryStats) {
@@ -739,19 +753,26 @@ public class ReservationController {
         return Result.success(result);
     }
 
+    /**
+     * 获取预约热力图数据
+     * 
+     * @return 预约热力图数据
+     */
     @GetMapping("/stats/heatmap")
     public Result<Map<String, Object>> getHeatmapStats(@RequestParam(required = false) String range) {
         LocalDateTime startTime = range != null ? getStartTimeByRange(range) : LocalDateTime.now().minusDays(30);
         LocalDateTime now = LocalDateTime.now();
 
         List<Reservation> reservations = reservationRepository.findByStartTimeAfter(startTime).stream()
-                .filter(reservation -> !("REJECTED".equals(reservation.getStatus()) || "CANCELLED".equals(reservation.getStatus())))
+                .filter(reservation -> !("REJECTED".equals(reservation.getStatus())
+                        || "CANCELLED".equals(reservation.getStatus())))
                 .collect(java.util.stream.Collectors.toList());
 
         if (currentUserService.hasRole("MAINTAINER")) {
             Set<Long> facilityIds = getCurrentMaintainerFacilityIds();
             reservations = reservations.stream()
-                    .filter(reservation -> reservation.getFacilityId() != null && facilityIds.contains(reservation.getFacilityId()))
+                    .filter(reservation -> reservation.getFacilityId() != null
+                            && facilityIds.contains(reservation.getFacilityId()))
                     .collect(java.util.stream.Collectors.toList());
         }
 
@@ -766,11 +787,13 @@ public class ReservationController {
 
         Map<Long, Long> facilityReservationCount = reservations.stream()
                 .filter(reservation -> reservation.getFacilityId() != null)
-                .collect(java.util.stream.Collectors.groupingBy(Reservation::getFacilityId, java.util.stream.Collectors.counting()));
+                .collect(java.util.stream.Collectors.groupingBy(Reservation::getFacilityId,
+                        java.util.stream.Collectors.counting()));
 
         List<Long> sortedFacilityIds = new ArrayList<>(facilityIds);
         sortedFacilityIds.sort(Comparator
-                .comparing((Long facilityId) -> facilityReservationCount.getOrDefault(facilityId, 0L), Comparator.reverseOrder())
+                .comparing((Long facilityId) -> facilityReservationCount.getOrDefault(facilityId, 0L),
+                        Comparator.reverseOrder())
                 .thenComparing(facilityId -> {
                     Facility facility = facilitiesById.get(facilityId);
                     return facility != null ? facility.getName() : "";
@@ -810,7 +833,8 @@ public class ReservationController {
                     ? facility.getLocation()
                     : "未标注区域";
 
-            double reservedHours = Math.max(Duration.between(reservation.getStartTime(), reservation.getEndTime()).toMinutes() / 60D, 0.5D);
+            double reservedHours = Math.max(
+                    Duration.between(reservation.getStartTime(), reservation.getEndTime()).toMinutes() / 60D, 0.5D);
             facilityReservedHours.merge(reservation.getFacilityId(), reservedHours, Double::sum);
             regionBookingCounter.merge(location, 1L, Long::sum);
             regionReservedHours.merge(location, reservedHours, Double::sum);
@@ -897,6 +921,9 @@ public class ReservationController {
         return Result.success(result);
     }
 
+    /**
+     * 根据时间范围获取开始时间。
+     */
     private LocalDateTime getStartTimeByRange(String range) {
         LocalDateTime now = LocalDateTime.now();
         return switch (range) {
@@ -913,7 +940,7 @@ public class ReservationController {
      * 检查两个时间段是否冲突。
      */
     private boolean isTimeConflict(LocalDateTime start1, LocalDateTime end1,
-                                   LocalDateTime start2, LocalDateTime end2) {
+            LocalDateTime start2, LocalDateTime end2) {
         return !(end1.isBefore(start2) || start1.isAfter(end2));
     }
 
@@ -926,8 +953,7 @@ public class ReservationController {
                 "APPROVED", Set.of("COMPLETED", "CANCELLED"),
                 "REJECTED", Set.of(),
                 "COMPLETED", Set.of(),
-                "CANCELLED", Set.of()
-        );
+                "CANCELLED", Set.of());
 
         Set<String> allowedTargets = allowedTransitions.getOrDefault(currentStatus, Set.of());
         return allowedTargets.contains(targetStatus);
@@ -942,18 +968,19 @@ public class ReservationController {
         }
 
         Map<Long, Facility> facilitiesById = facilityRepository.findAllById(
-                        reservations.stream()
-                                .map(Reservation::getFacilityId)
-                                .filter(Objects::nonNull)
-                                .collect(java.util.stream.Collectors.toSet()))
+                reservations.stream()
+                        .map(Reservation::getFacilityId)
+                        .filter(Objects::nonNull)
+                        .collect(java.util.stream.Collectors.toSet()))
                 .stream()
                 .collect(java.util.stream.Collectors.toMap(Facility::getId, facility -> facility));
 
         Map<Long, User> usersById = userRepository.findAllById(
-                        reservations.stream()
-                                .flatMap(reservation -> java.util.stream.Stream.of(reservation.getUserId(), reservation.getVerifiedBy()))
-                                .filter(Objects::nonNull)
-                                .collect(java.util.stream.Collectors.toSet()))
+                reservations.stream()
+                        .flatMap(reservation -> java.util.stream.Stream.of(reservation.getUserId(),
+                                reservation.getVerifiedBy()))
+                        .filter(Objects::nonNull)
+                        .collect(java.util.stream.Collectors.toSet()))
                 .stream()
                 .collect(java.util.stream.Collectors.toMap(User::getId, user -> user));
 
@@ -1013,6 +1040,9 @@ public class ReservationController {
         }
     }
 
+    /**
+     * 获取用户显示名称。
+     */
     private String getDisplayName(User user) {
         String displayName = user.getRealName();
         if (displayName == null || displayName.trim().isEmpty()) {
@@ -1021,6 +1051,11 @@ public class ReservationController {
         return displayName;
     }
 
+    /**
+     * 过滤当前维护人员的预约记录。
+     * 如果当前用户不是维护人员，返回所有预约记录。
+     * 如果是，返回其管理的设施预约记录。
+     */
     private List<Reservation> filterReservationsForCurrentMaintainer(List<Reservation> reservations) {
         if (!currentUserService.hasRole("MAINTAINER")) {
             return reservations;
@@ -1028,10 +1063,16 @@ public class ReservationController {
 
         Set<Long> facilityIds = getCurrentMaintainerFacilityIds();
         return reservations.stream()
-                .filter(reservation -> reservation.getFacilityId() != null && facilityIds.contains(reservation.getFacilityId()))
+                .filter(reservation -> reservation.getFacilityId() != null
+                        && facilityIds.contains(reservation.getFacilityId()))
                 .collect(java.util.stream.Collectors.toList());
     }
 
+    /**
+     * 获取当前维护人员管理的设施ID列表。
+     * 如果当前用户不是维护人员，返回空集合。
+     * 如果是，返回其管理的设施ID列表。
+     */
     private Set<Long> getCurrentMaintainerFacilityIds() {
         Long currentUserId = currentUserService.getCurrentUserId();
         if (currentUserId == null) {
@@ -1044,6 +1085,12 @@ public class ReservationController {
                 .collect(java.util.stream.Collectors.toSet());
     }
 
+    /**
+     * 检查当前维护人员是否可以管理指定设施。
+     * 如果当前用户不是维护人员，返回 true。
+     * 如果是，检查设施ID是否在当前维护人员管理的设施ID列表中。
+     * 如果在，返回 true；否则返回 false。
+     */
     private boolean canCurrentMaintainerManageFacility(Long facilityId) {
         if (!currentUserService.hasRole("MAINTAINER")) {
             return true;
@@ -1053,6 +1100,7 @@ public class ReservationController {
 
     /**
      * 系统启动时执行一次爽约检查。
+     * 检查所有已审批且未签到的预约，自动标记爽约。
      */
     @Async
     @EventListener(ApplicationReadyEvent.class)
@@ -1064,13 +1112,15 @@ public class ReservationController {
 
     /**
      * 定时任务：自动标记爽约预约。
+     * 每 5 分钟执行一次，检查所有已审批且未签到的预约，自动标记爽约。
      */
     @Scheduled(cron = "0 0/5 * * * ?")
     public void autoMarkMissedReservations() {
         LocalDateTime now = LocalDateTime.now();
         System.out.println("开始执行爽约检查，当前时间: " + now);
 
-        List<Reservation> missedReservations = reservationRepository.findByStatusAndCheckinStatus("APPROVED", "NOT_CHECKED");
+        List<Reservation> missedReservations = reservationRepository.findByStatusAndCheckinStatus("APPROVED",
+                "NOT_CHECKED");
         System.out.println("找到 " + missedReservations.size() + " 条待检查的预约");
 
         int missedCount = 0;
@@ -1107,8 +1157,8 @@ public class ReservationController {
                     violationRecord.setReservationId(reservation.getId());
                     violationRecord.setViolationType("NO_SHOW");
                     violationRecord.setDescription(
-                            "爽约记录: " + missedReason + "。预约时间: " + reservation.getStartTime() + " 至 " + reservation.getEndTime()
-                    );
+                            "爽约记录: " + missedReason + "。预约时间: " + reservation.getStartTime() + " 至 "
+                                    + reservation.getEndTime());
                     violationRecord.setPenaltyPoints(5);
                     violationRecord.setReportedBy(76L);
                     violationRecord.setReportedTime(LocalDateTime.now());
@@ -1125,8 +1175,7 @@ public class ReservationController {
                                 + ", 用户ID=" + reservation.getUserId()
                                 + ", 设施ID=" + reservation.getFacilityId()
                                 + ", 预约时间=" + reservation.getStartTime() + "-" + reservation.getEndTime()
-                                + ", 原因=" + missedReason
-                );
+                                + ", 原因=" + missedReason);
             }
         }
 
@@ -1137,6 +1186,8 @@ public class ReservationController {
 
     /**
      * 校验预约是否符合规则配置。
+     * 如果预约符合规则，返回成功结果。
+     * 如果不符合，返回错误结果。
      */
     private Result<String> validateReservationRules(Reservation reservation, Facility facility) {
         RuleConfig ruleConfig = getApplicableRuleConfig(facility);
@@ -1201,8 +1252,7 @@ public class ReservationController {
         if (ruleConfig.getMaxActiveBookings() != null) {
             List<Reservation> userActiveReservations = reservationRepository.findByUserIdAndStatusIn(
                     reservation.getUserId(),
-                    Arrays.asList("PENDING", "APPROVED")
-            );
+                    Arrays.asList("PENDING", "APPROVED"));
 
             if (userActiveReservations.size() >= ruleConfig.getMaxActiveBookings()) {
                 return Result.error("当前有效预约数量已达上限（" + ruleConfig.getMaxActiveBookings() + " 个）");
@@ -1214,6 +1264,9 @@ public class ReservationController {
 
     /**
      * 获取适用的预约规则。
+     * 如果设施有分类，返回该分类的规则配置。
+     * 如果没有分类，返回默认规则配置。
+     * 如果没有默认规则配置，返回 null。
      */
     private RuleConfig getApplicableRuleConfig(Facility facility) {
         if (facility.getCategory() != null) {

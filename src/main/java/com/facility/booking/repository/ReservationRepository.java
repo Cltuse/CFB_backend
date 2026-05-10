@@ -12,152 +12,171 @@ import java.util.Optional;
 
 @Repository
 public interface ReservationRepository extends JpaRepository<Reservation, Long> {
-    interface CategoryCountView {
-        String getCategory();
-        Long getTotal();
-    }
+        // 定义视图接口，用于查询分类统计
+        interface CategoryCountView {
+                String getCategory();
 
-    interface DailyTrendView {
-        String getDate();
-        Long getTotal();
-        Long getPending();
-        Long getApproved();
-        Long getCompleted();
-    }
+                Long getTotal();
+        }
 
-    List<Reservation> findByUserId(Long userId);
+        // 定义视图接口，用于查询日趋势统计
+        interface DailyTrendView {
+                String getDate();
 
-    List<Reservation> findByFacilityId(Long facilityId);
+                Long getTotal();
 
-    List<Reservation> findByFacilityIdIn(List<Long> facilityIds);
+                Long getPending();
 
-    List<Reservation> findByStatus(String status);
+                Long getApproved();
 
-    long countByStatus(String status);
+                Long getCompleted();
+        }
 
-    long countByCheckinStatus(String checkinStatus);
+        // 根据用户ID查询所有预约，返回所有符合条件的预约
+        List<Reservation> findByUserId(Long userId);
 
-    long countByCreatedAtAfter(LocalDateTime startTime);
+        // 根据设施ID查询所有预约，返回所有符合条件的预约
+        List<Reservation> findByFacilityId(Long facilityId);
 
-    long countByCreatedAtAfterAndStatus(LocalDateTime startTime, String status);
+        // 根据设施ID列表查询所有预约，返回所有符合条件的预约
+        List<Reservation> findByFacilityIdIn(List<Long> facilityIds);
 
-    @Query("SELECT r FROM Reservation r WHERE r.createdAt >= :startTime")
-    List<Reservation> findByCreatedAtAfter(@Param("startTime") LocalDateTime startTime);
+        // 根据状态查询所有预约，返回所有符合条件的预约
+        List<Reservation> findByStatus(String status);
 
-    @Query("SELECT r FROM Reservation r WHERE r.createdAt >= :startTime AND r.facilityId IN :facilityIds")
-    List<Reservation> findByCreatedAtAfterAndFacilityIdIn(@Param("startTime") LocalDateTime startTime,
-                                                          @Param("facilityIds") List<Long> facilityIds);
+        // 根据状态查询所有预约的数量，返回符合条件的预约数量
+        long countByStatus(String status);
 
-    @Query(value = """
-            SELECT COALESCE(f.category, '未分类') AS category, COUNT(*) AS total
-            FROM reservation r
-            LEFT JOIN facility f ON f.id = r.facility_id
-            WHERE r.created_at >= :startTime
-            GROUP BY COALESCE(f.category, '未分类')
-            ORDER BY total DESC
-            """, nativeQuery = true)
-    List<CategoryCountView> countCategoryStatsAfter(@Param("startTime") LocalDateTime startTime);
+        // 根据检查状态查询所有预约的数量，返回符合条件的预约数量
+        long countByCheckinStatus(String checkinStatus);
 
-    @Query(value = """
-            SELECT DATE(created_at) AS date,
-                   COUNT(*) AS total,
-                   SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) AS pending,
-                   SUM(CASE WHEN status = 'APPROVED' THEN 1 ELSE 0 END) AS approved,
-                   SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed
-            FROM reservation
-            WHERE created_at >= :startTime AND created_at < :endTime
-            GROUP BY DATE(created_at)
-            ORDER BY DATE(created_at)
-            """, nativeQuery = true)
-    List<DailyTrendView> countDailyTrends(@Param("startTime") LocalDateTime startTime,
-                                          @Param("endTime") LocalDateTime endTime);
+        // 根据创建时间查询所有预约的数量，返回符合条件的预约数量
+        long countByCreatedAtAfter(LocalDateTime startTime);
 
-    @Query("SELECT r FROM Reservation r WHERE " +
-            "LOWER(r.purpose) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "EXISTS(SELECT u FROM User u WHERE u.id = r.userId AND " +
-            "(LOWER(u.realName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(u.username) LIKE LOWER(CONCAT('%', :keyword, '%')))) OR " +
-            "EXISTS(SELECT f FROM Facility f WHERE f.id = r.facilityId AND " +
-            "LOWER(f.name) LIKE LOWER(CONCAT('%', :keyword, '%')))")
-    List<Reservation> findByKeyword(@Param("keyword") String keyword);
+        // 根据创建时间查询所有预约的数量，返回符合条件的预约数量
 
-    List<Reservation> findByCheckinStatus(String checkinStatus);
+        long countByCreatedAtAfterAndStatus(LocalDateTime startTime, String status);
 
-    List<Reservation> findByStatusAndCheckinStatus(String status, String checkinStatus);
+        // 查询指定时间戳之后的所有预约，返回所有符合条件的预约
+        @Query("SELECT r FROM Reservation r WHERE r.createdAt >= :startTime")
+        List<Reservation> findByCreatedAtAfter(@Param("startTime") LocalDateTime startTime);
 
-    List<Reservation> findByCheckinStatusAndStartTimeBetween(String checkinStatus,
-                                                             LocalDateTime startTime,
-                                                             LocalDateTime endTime);
+        // 查询指定时间戳之后的所有预约，返回所有符合条件的预约
+        @Query("SELECT r FROM Reservation r WHERE r.createdAt >= :startTime AND r.facilityId IN :facilityIds")
+        List<Reservation> findByCreatedAtAfterAndFacilityIdIn(@Param("startTime") LocalDateTime startTime,
+                        @Param("facilityIds") List<Long> facilityIds);
 
-    List<Reservation> findByCheckinStatusAndEndTimeBefore(String checkinStatus, LocalDateTime endTime);
+        // 查询指定时间戳之后的所有预约，返回所有符合条件的预约
+        @Query(value = """
+                        SELECT COALESCE(f.category, '未分类') AS category, COUNT(*) AS total
+                        FROM reservation r
+                        LEFT JOIN facility f ON f.id = r.facility_id
+                        WHERE r.created_at >= :startTime
+                        GROUP BY COALESCE(f.category, '未分类')
+                        ORDER BY total DESC
+                        """, nativeQuery = true)
+        List<CategoryCountView> countCategoryStatsAfter(@Param("startTime") LocalDateTime startTime);
 
-    @Query("SELECT r FROM Reservation r WHERE r.userId = :userId AND r.status IN :statuses")
-    List<Reservation> findByUserIdAndStatusIn(@Param("userId") Long userId,
-                                              @Param("statuses") List<String> statuses);
+        @Query(value = """
+                        SELECT DATE(created_at) AS date,
+                               COUNT(*) AS total,
+                               SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) AS pending,
+                               SUM(CASE WHEN status = 'APPROVED' THEN 1 ELSE 0 END) AS approved,
+                               SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed
+                        FROM reservation
+                        WHERE created_at >= :startTime AND created_at < :endTime
+                        GROUP BY DATE(created_at)
+                        ORDER BY DATE(created_at)
+                        """, nativeQuery = true)
+        List<DailyTrendView> countDailyTrends(@Param("startTime") LocalDateTime startTime,
+                        @Param("endTime") LocalDateTime endTime);
 
-    @Query("""
-            SELECT COUNT(r) FROM Reservation r
-            WHERE r.userId = :userId
-              AND r.startTime >= :dayStart
-              AND r.startTime < :dayEnd
-              AND r.status NOT IN :excludedStatuses
-              AND (:excludeReservationId IS NULL OR r.id <> :excludeReservationId)
-              AND EXISTS (
-                    SELECT f.id FROM Facility f
-                    WHERE f.id = r.facilityId
-                      AND ((:category IS NULL AND f.category IS NULL) OR f.category = :category)
-              )
-            """)
-    long countCategoryReservationsForDay(@Param("userId") Long userId,
-                                         @Param("category") String category,
-                                         @Param("dayStart") LocalDateTime dayStart,
-                                         @Param("dayEnd") LocalDateTime dayEnd,
-                                         @Param("excludedStatuses") List<String> excludedStatuses,
-                                         @Param("excludeReservationId") Long excludeReservationId);
+        @Query("SELECT r FROM Reservation r WHERE " +
+                        "LOWER(r.purpose) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+                        "EXISTS(SELECT u FROM User u WHERE u.id = r.userId AND " +
+                        "(LOWER(u.realName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+                        "LOWER(u.username) LIKE LOWER(CONCAT('%', :keyword, '%')))) OR " +
+                        "EXISTS(SELECT f FROM Facility f WHERE f.id = r.facilityId AND " +
+                        "LOWER(f.name) LIKE LOWER(CONCAT('%', :keyword, '%')))")
+        List<Reservation> findByKeyword(@Param("keyword") String keyword);
 
-    @Query("""
-            SELECT COUNT(r) FROM Reservation r
-            WHERE r.userId = :userId
-              AND r.status IN :statuses
-              AND r.endTime > :referenceTime
-              AND (:excludeReservationId IS NULL OR r.id <> :excludeReservationId)
-              AND EXISTS (
-                    SELECT f.id FROM Facility f
-                    WHERE f.id = r.facilityId
-                      AND ((:category IS NULL AND f.category IS NULL) OR f.category = :category)
-              )
-            """)
-    long countCategoryActiveReservations(@Param("userId") Long userId,
-                                         @Param("category") String category,
-                                         @Param("statuses") List<String> statuses,
-                                         @Param("referenceTime") LocalDateTime referenceTime,
-                                         @Param("excludeReservationId") Long excludeReservationId);
+        List<Reservation> findByCheckinStatus(String checkinStatus);
 
-    @Query("SELECT r FROM Reservation r WHERE r.verificationCode = :verificationCode")
-    Optional<Reservation> findByVerificationCode(@Param("verificationCode") String verificationCode);
+        List<Reservation> findByStatusAndCheckinStatus(String status, String checkinStatus);
 
-    @Query("SELECT r FROM Reservation r WHERE r.facilityId = :facilityId " +
-            "AND r.status IN :statuses " +
-            "AND ((r.startTime < :endTime AND r.endTime > :startTime))")
-    List<Reservation> findConflictingReservations(@Param("facilityId") Long facilityId,
-                                                  @Param("startTime") LocalDateTime startTime,
-                                                  @Param("endTime") LocalDateTime endTime,
-                                                  @Param("statuses") List<String> statuses);
+        List<Reservation> findByCheckinStatusAndStartTimeBetween(String checkinStatus,
+                        LocalDateTime startTime,
+                        LocalDateTime endTime);
 
-    @Query("SELECT r FROM Reservation r WHERE r.userId = :userId AND r.facilityId = :facilityId")
-    List<Reservation> findByUserIdAndFacilityId(@Param("userId") Long userId,
-                                                @Param("facilityId") Long facilityId);
+        List<Reservation> findByCheckinStatusAndEndTimeBefore(String checkinStatus, LocalDateTime endTime);
 
-    @Query("SELECT DISTINCT r.userId FROM Reservation r")
-    List<Long> findDistinctUserIds();
+        @Query("SELECT r FROM Reservation r WHERE r.userId = :userId AND r.status IN :statuses")
+        List<Reservation> findByUserIdAndStatusIn(@Param("userId") Long userId,
+                        @Param("statuses") List<String> statuses);
 
-    @Query("SELECT r FROM Reservation r WHERE r.startTime >= :startDate")
-    List<Reservation> findByStartTimeAfter(@Param("startDate") LocalDateTime startDate);
+        @Query("""
+                        SELECT COUNT(r) FROM Reservation r
+                        WHERE r.userId = :userId
+                          AND r.startTime >= :dayStart
+                          AND r.startTime < :dayEnd
+                          AND r.status NOT IN :excludedStatuses
+                          AND (:excludeReservationId IS NULL OR r.id <> :excludeReservationId)
+                          AND EXISTS (
+                                SELECT f.id FROM Facility f
+                                WHERE f.id = r.facilityId
+                                  AND ((:category IS NULL AND f.category IS NULL) OR f.category = :category)
+                          )
+                        """)
+        long countCategoryReservationsForDay(@Param("userId") Long userId,
+                        @Param("category") String category,
+                        @Param("dayStart") LocalDateTime dayStart,
+                        @Param("dayEnd") LocalDateTime dayEnd,
+                        @Param("excludedStatuses") List<String> excludedStatuses,
+                        @Param("excludeReservationId") Long excludeReservationId);
 
-    @Query("SELECT DISTINCT r.userId FROM Reservation r WHERE r.startTime >= :activeDate")
-    List<Long> findActiveUserIds(@Param("activeDate") LocalDateTime activeDate);
+        @Query("""
+                        SELECT COUNT(r) FROM Reservation r
+                        WHERE r.userId = :userId
+                          AND r.status IN :statuses
+                          AND r.endTime > :referenceTime
+                          AND (:excludeReservationId IS NULL OR r.id <> :excludeReservationId)
+                          AND EXISTS (
+                                SELECT f.id FROM Facility f
+                                WHERE f.id = r.facilityId
+                                  AND ((:category IS NULL AND f.category IS NULL) OR f.category = :category)
+                          )
+                        """)
+        long countCategoryActiveReservations(@Param("userId") Long userId,
+                        @Param("category") String category,
+                        @Param("statuses") List<String> statuses,
+                        @Param("referenceTime") LocalDateTime referenceTime,
+                        @Param("excludeReservationId") Long excludeReservationId);
 
-    List<Reservation> findByStatusAndCheckinStatusAndStartTimeBefore(String status,
-                                                                     String checkinStatus,
-                                                                     LocalDateTime startTime);
+        @Query("SELECT r FROM Reservation r WHERE r.verificationCode = :verificationCode")
+        Optional<Reservation> findByVerificationCode(@Param("verificationCode") String verificationCode);
+
+        @Query("SELECT r FROM Reservation r WHERE r.facilityId = :facilityId " +
+                        "AND r.status IN :statuses " +
+                        "AND ((r.startTime < :endTime AND r.endTime > :startTime))")
+        List<Reservation> findConflictingReservations(@Param("facilityId") Long facilityId,
+                        @Param("startTime") LocalDateTime startTime,
+                        @Param("endTime") LocalDateTime endTime,
+                        @Param("statuses") List<String> statuses);
+
+        @Query("SELECT r FROM Reservation r WHERE r.userId = :userId AND r.facilityId = :facilityId")
+        List<Reservation> findByUserIdAndFacilityId(@Param("userId") Long userId,
+                        @Param("facilityId") Long facilityId);
+
+        @Query("SELECT DISTINCT r.userId FROM Reservation r")
+        List<Long> findDistinctUserIds();
+
+        @Query("SELECT r FROM Reservation r WHERE r.startTime >= :startDate")
+        List<Reservation> findByStartTimeAfter(@Param("startDate") LocalDateTime startDate);
+
+        @Query("SELECT DISTINCT r.userId FROM Reservation r WHERE r.startTime >= :activeDate")
+        List<Long> findActiveUserIds(@Param("activeDate") LocalDateTime activeDate);
+
+        List<Reservation> findByStatusAndCheckinStatusAndStartTimeBefore(String status,
+                        String checkinStatus,
+                        LocalDateTime startTime);
 }

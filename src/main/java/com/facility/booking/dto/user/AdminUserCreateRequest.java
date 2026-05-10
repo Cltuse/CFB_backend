@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
+// 管理员用户创建请求DTO
 public class AdminUserCreateRequest {
     @NotBlank(message = "用户名不能为空")
     @Size(min = 3, max = 50, message = "用户名长度必须在 3 到 50 个字符之间")

@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
+// 当前用户信息更新请求DTO
 public class CurrentUserProfileUpdateRequest {
     @NotBlank(message = "真实姓名不能为空")
     @Size(min = 2, max = 50, message = "真实姓名长度必须在 2 到 50 个字符之间")

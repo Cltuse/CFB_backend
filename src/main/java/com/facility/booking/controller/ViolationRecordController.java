@@ -42,6 +42,11 @@ public class ViolationRecordController {
 
     /**
      * 上报违规记录。
+     * 如果当前用户不是管理员或设施人员，返回错误结果。
+     * 如果关联的预约记录不存在，返回错误结果。
+     * 如果当前用户不是设施管理员，且关联的预约记录不是自己负责的，返回错误结果。
+     * 如果违规记录符合规则，返回成功结果。
+     * 如果不符合，返回错误结果。
      */
     @PostMapping("/record")
     @OperationLog(operationType = "CREATE_VIOLATION", detail = "创建违规记录")
@@ -72,7 +77,8 @@ public class ViolationRecordController {
                 if (violationRecord.getReservationId() == null) {
                     return Result.error(400, "设施管理员上报违规时必须关联预约记录");
                 }
-                if (!violationRecordService.canMaintainerAccessReservation(currentUserId, violationRecord.getReservationId())) {
+                if (!violationRecordService.canMaintainerAccessReservation(currentUserId,
+                        violationRecord.getReservationId())) {
                     return Result.error(403, "只能上报自己负责设施的预约违规");
                 }
             }
@@ -95,11 +101,16 @@ public class ViolationRecordController {
 
     /**
      * 获取用户违规记录。
+     * 如果当前用户不是设施管理员，返回错误结果。
+     * 如果用户不存在，返回错误结果。
+     * 如果用户违规记录为空，返回空结果。
+     * 如果用户违规记录不为空，返回违规记录列表。
+     * 如果获取违规记录失败，返回错误结果。
      */
     @GetMapping("/user/{userId}")
     public Result<Page<ViolationRecord>> getUserViolations(@PathVariable Long userId,
-                                                           @RequestParam(defaultValue = "0") int page,
-                                                           @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
         try {
             Pageable pageable = PageUtils.of(page, size, Sort.by(Sort.Direction.DESC, "reportedTime"));
             Page<ViolationRecord> violations = violationRecordService.getUserViolations(userId, pageable);
@@ -111,6 +122,11 @@ public class ViolationRecordController {
 
     /**
      * 获取违规记录详情。
+     * 如果当前用户不是设施管理员，返回错误结果。
+     * 如果违规记录不存在，返回错误结果。
+     * 如果当前用户不是设施管理员，且违规记录不是自己负责的，返回错误结果。
+     * 如果违规记录存在，返回违规记录详情。
+     * 如果获取违规记录详情失败，返回错误结果。
      */
     @GetMapping("/{id}")
     public Result<ViolationRecord> getViolationDetail(@PathVariable Long id) {
@@ -136,6 +152,11 @@ public class ViolationRecordController {
 
     /**
      * 获取用户已生效违规数量。
+     * 如果当前用户不是设施管理员，返回错误结果。
+     * 如果用户不存在，返回错误结果。
+     * 如果用户违规记录为空，返回0结果。
+     * 如果用户违规记录不为空，返回活跃违规数量。
+     * 如果获取活跃违规数量失败，返回错误结果。
      */
     @GetMapping("/user/{userId}/active/count")
     public Result<Long> getActiveViolationCount(@PathVariable Long userId) {
@@ -149,6 +170,11 @@ public class ViolationRecordController {
 
     /**
      * 获取用户累计处罚分。
+     * 如果当前用户不是设施管理员，返回错误结果。
+     * 如果用户不存在，返回错误结果。
+     * 如果用户违规记录为空，返回0结果。
+     * 如果用户违规记录不为空，返回累计处罚分。
+     * 如果获取累计处罚分失败，返回错误结果。
      */
     @GetMapping("/user/{userId}/total-penalty")
     public Result<Integer> getTotalPenaltyPoints(@PathVariable Long userId) {
@@ -162,6 +188,11 @@ public class ViolationRecordController {
 
     /**
      * 获取用户当前信用分。
+     * 如果当前用户不是设施管理员，返回错误结果。
+     * 如果用户不存在，返回错误结果。
+     * 如果用户违规记录为空，返回0结果。
+     * 如果用户违规记录不为空，返回当前信用分。
+     * 如果获取当前信用分失败，返回错误结果。
      */
     @GetMapping("/user/{userId}/credit-score")
     public Result<Integer> getUserCurrentCreditScore(@PathVariable Long userId) {
@@ -175,6 +206,11 @@ public class ViolationRecordController {
 
     /**
      * 获取用户违规次数。
+     * 如果当前用户不是设施管理员，返回错误结果。
+     * 如果用户不存在，返回错误结果。
+     * 如果用户违规记录为空，返回0结果。
+     * 如果用户违规记录不为空，返回违规次数。
+     * 如果获取违规次数失败，返回错误结果。
      */
     @GetMapping("/user/{userId}/violation-count")
     public Result<Integer> getUserViolationCount(@PathVariable Long userId) {
@@ -188,6 +224,9 @@ public class ViolationRecordController {
 
     /**
      * 更新违规记录状态。
+     * 如果当前用户不是设施管理员，返回错误结果。
+     * 如果违规记录不存在，返回错误结果。
+     * 如果更新违规状态失败，返回错误结果。
      */
     @PutMapping("/{id}/status")
     @OperationLog(operationType = "UPDATE_VIOLATION_STATUS", detail = "更新违规状态")
@@ -220,6 +259,11 @@ public class ViolationRecordController {
 
     /**
      * 获取用户某段时间内的违规记录。
+     * 如果当前用户不是设施管理员，返回错误结果。
+     * 如果用户不存在，返回错误结果。
+     * 如果用户违规记录为空，返回空结果。
+     * 如果用户违规记录不为空，返回违规记录列表。
+     * 如果获取违规记录失败，返回错误结果。
      */
     @GetMapping("/user/{userId}/time-range")
     public Result<Page<ViolationRecord>> getUserViolationsByTimeRange(
@@ -227,13 +271,11 @@ public class ViolationRecordController {
             @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startTime,
             @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size
-    ) {
+            @RequestParam(defaultValue = "10") int size) {
         try {
             Pageable pageable = PageUtils.of(page, size, Sort.by(Sort.Direction.DESC, "reportedTime"));
             Page<ViolationRecord> violations = violationRecordService.getUserViolationsByTimeRange(
-                    userId, startTime, endTime, pageable
-            );
+                    userId, startTime, endTime, pageable);
             return Result.success("获取时间段内违规记录成功", violations);
         } catch (Exception e) {
             return Result.error("获取时间段内违规记录失败: " + e.getMessage());
@@ -241,17 +283,22 @@ public class ViolationRecordController {
     }
 
     /**
-     * 获取全部违规记录。
+     * 获取设施管理员负责场地对应的违规记录。
+     * 如果当前用户不是设施管理员，返回错误结果。
+     * 如果违规记录为空，返回空结果。
+     * 如果违规记录不为空，返回违规记录列表。
+     * 如果获取违规记录失败，返回错误结果。
      */
     @GetMapping("/all")
     public Result<Page<ViolationRecord>> getAllViolations(@RequestParam(defaultValue = "0") int page,
-                                                          @RequestParam(defaultValue = "10") int size,
-                                                          @RequestParam(required = false) String userName,
-                                                          @RequestParam(required = false) String violationType,
-                                                          @RequestParam(required = false) String status) {
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String userName,
+            @RequestParam(required = false) String violationType,
+            @RequestParam(required = false) String status) {
         try {
             Pageable pageable = PageUtils.of(page, size, Sort.by(Sort.Direction.DESC, "reportedTime"));
-            Page<ViolationRecord> violations = violationRecordService.getAllViolations(pageable, userName, violationType, status);
+            Page<ViolationRecord> violations = violationRecordService.getAllViolations(pageable, userName,
+                    violationType, status);
             return Result.success("获取违规记录成功", violations);
         } catch (Exception e) {
             System.err.println("获取违规记录失败: " + e.getMessage());
@@ -262,14 +309,18 @@ public class ViolationRecordController {
 
     /**
      * 获取设施管理员负责场地对应的违规记录。
+     * 如果当前用户不是设施管理员，返回错误结果。
+     * 如果违规记录为空，返回空结果。
+     * 如果违规记录不为空，返回违规记录列表。
+     * 如果获取违规记录失败，返回错误结果。
      */
     @GetMapping("/maintainer")
     public Result<Page<ViolationRecord>> getMaintainerViolations(@RequestParam(defaultValue = "0") int page,
-                                                                 @RequestParam(defaultValue = "10") int size,
-                                                                 @RequestParam(required = false) Long maintainerId,
-                                                                 @RequestParam(required = false) String userName,
-                                                                 @RequestParam(required = false) String violationType,
-                                                                 @RequestParam(required = false) String status) {
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) Long maintainerId,
+            @RequestParam(required = false) String userName,
+            @RequestParam(required = false) String violationType,
+            @RequestParam(required = false) String status) {
         try {
             Pageable pageable = PageUtils.of(page, size, Sort.by(Sort.Direction.DESC, "reportedTime"));
 
@@ -279,8 +330,7 @@ public class ViolationRecordController {
             }
 
             Page<ViolationRecord> violations = violationRecordService.getMaintainerViolations(
-                    pageable, scopedMaintainerId, userName, violationType, status
-            );
+                    pageable, scopedMaintainerId, userName, violationType, status);
             return Result.success("获取设施管理员违规记录成功", violations);
         } catch (Exception e) {
             return Result.error("获取设施管理员违规记录失败: " + e.getMessage());
@@ -289,6 +339,8 @@ public class ViolationRecordController {
 
     /**
      * 获取违规统计数据。
+     * 如果当前用户不是设施管理员，返回错误结果。
+     * 如果获取违规统计数据失败，返回错误结果。
      */
     @GetMapping("/stats")
     public Result<Map<String, Object>> getViolationStats() {
@@ -304,11 +356,14 @@ public class ViolationRecordController {
 
     /**
      * 确认违规记录。
+     * 如果当前用户不是设施管理员，返回错误结果。
+     * 如果违规记录不存在，返回错误结果。
+     * 如果确认违规记录失败，返回错误结果。
      */
     @PostMapping("/{id}/approve")
     @OperationLog(operationType = "APPROVE_VIOLATION", detail = "确认违规记录")
     public Result<Map<String, Object>> approveViolation(@PathVariable Long id,
-                                                        @RequestParam(required = false) String remark) {
+            @RequestParam(required = false) String remark) {
         try {
             Long currentUserId = currentUserService.getCurrentUserId();
             if (currentUserId == null) {
@@ -339,11 +394,14 @@ public class ViolationRecordController {
 
     /**
      * 驳回违规记录。
+     * 如果当前用户不是设施管理员，返回错误结果。
+     * 如果违规记录不存在，返回错误结果。
+     * 如果驳回违规记录失败，返回错误结果。
      */
     @PostMapping("/{id}/reject")
     @OperationLog(operationType = "REJECT_VIOLATION", detail = "驳回违规记录")
     public Result<Map<String, Object>> rejectViolation(@PathVariable Long id,
-                                                       @RequestParam(required = false) String remark) {
+            @RequestParam(required = false) String remark) {
         try {
             Long currentUserId = currentUserService.getCurrentUserId();
             if (currentUserId == null) {
@@ -374,11 +432,14 @@ public class ViolationRecordController {
 
     /**
      * 撤销已生效违规记录。
+     * 如果当前用户不是设施管理员，返回错误结果。
+     * 如果违规记录不存在，返回错误结果。
+     * 如果撤销违规记录失败，返回错误结果。
      */
     @PostMapping("/{id}/revoke")
     @OperationLog(operationType = "REVOKE_VIOLATION", detail = "撤销已生效违规")
     public Result<Map<String, Object>> revokeViolation(@PathVariable Long id,
-                                                       @RequestParam(required = false) String remark) {
+            @RequestParam(required = false) String remark) {
         try {
             Long currentUserId = currentUserService.getCurrentUserId();
             if (currentUserId == null) {
@@ -409,6 +470,8 @@ public class ViolationRecordController {
 
     /**
      * 获取用户已生效处罚分。
+     * 如果用户不存在，返回错误结果。
+     * 如果获取已生效处罚分失败，返回错误结果。
      */
     @GetMapping("/user/{userId}/processed-penalty")
     public Result<Integer> getProcessedPenaltyPoints(@PathVariable Long userId) {

@@ -11,17 +11,20 @@ import java.util.List;
 
 @Repository
 public interface FacilityHotScoreRepository extends JpaRepository<FacilityHotScore, Long> {
-    
+
     @Modifying
     @Query("DELETE FROM FacilityHotScore")
     void deleteAllHotScores();
 
+    // 查询所有热门设施
     @Query("SELECT fhs FROM FacilityHotScore fhs ORDER BY fhs.hotScore DESC")
     List<FacilityHotScore> findAllOrderByHotScoreDesc();
 
+    // 查询热门设施
     @Query("SELECT fhs FROM FacilityHotScore fhs ORDER BY fhs.hotScore DESC LIMIT :limit")
     List<FacilityHotScore> findTopHotFacilities(@Param("limit") int limit);
-    
+
+    // 分页查询热门设施
     @Query("SELECT fhs FROM FacilityHotScore fhs ORDER BY fhs.hotScore DESC")
     List<FacilityHotScore> findAllByOrderByHotScoreDesc(org.springframework.data.domain.Pageable pageable);
 }

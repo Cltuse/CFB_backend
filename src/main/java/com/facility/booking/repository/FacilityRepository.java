@@ -15,39 +15,51 @@ import java.util.Optional;
 
 @Repository
 public interface FacilityRepository extends JpaRepository<Facility, Long> {
-    List<Facility> findByStatus(String status);
 
-    List<Facility> findByNameContaining(String name);
+       // 查询所有设施
+       List<Facility> findByStatus(String status);
 
-    List<Facility> findByCategory(String category);
+       // 查询所有设施
+       List<Facility> findByNameContaining(String name);
 
-    List<Facility> findByMaintainerId(Long maintainerId);
+       // 查询所有设施
+       List<Facility> findByCategory(String category);
 
-    Page<Facility> findAll(Pageable pageable);
+       // 查询所有设施
+       List<Facility> findByMaintainerId(Long maintainerId);
 
-    Page<Facility> findByMaintainerId(Long maintainerId, Pageable pageable);
+       // 分页查询所有设施
+       Page<Facility> findAll(Pageable pageable);
 
-    @Query("SELECT e FROM Facility e WHERE " +
-           "e.name LIKE %:keyword% OR " +
-           "e.model LIKE %:keyword% OR " +
-           "e.category LIKE %:keyword% OR " +
-           "e.location LIKE %:keyword%")
-    Page<Facility> searchByKeyword(@Param("keyword") String keyword, Pageable pageable);
+       // 分页查询所有设施
+       Page<Facility> findByMaintainerId(Long maintainerId, Pageable pageable);
 
-    @Query("SELECT e FROM Facility e WHERE e.maintainerId = :maintainerId AND (" +
-           "e.name LIKE %:keyword% OR " +
-           "e.model LIKE %:keyword% OR " +
-           "e.category LIKE %:keyword% OR " +
-           "e.location LIKE %:keyword%)")
-    Page<Facility> searchByKeywordAndMaintainerId(@Param("keyword") String keyword,
-                                                  @Param("maintainerId") Long maintainerId,
-                                                  Pageable pageable);
+       // 分页查询所有设施
+       @Query("SELECT e FROM Facility e WHERE " +
+                     "e.name LIKE %:keyword% OR " +
+                     "e.model LIKE %:keyword% OR " +
+                     "e.category LIKE %:keyword% OR " +
+                     "e.location LIKE %:keyword%")
+       Page<Facility> searchByKeyword(@Param("keyword") String keyword, Pageable pageable);
 
-    Page<Facility> findByStatus(String status, Pageable pageable);
+       // 分页查询所有设施
+       @Query("SELECT e FROM Facility e WHERE e.maintainerId = :maintainerId AND (" +
+                     "e.name LIKE %:keyword% OR " +
+                     "e.model LIKE %:keyword% OR " +
+                     "e.category LIKE %:keyword% OR " +
+                     "e.location LIKE %:keyword%)")
+       Page<Facility> searchByKeywordAndMaintainerId(@Param("keyword") String keyword,
+                     @Param("maintainerId") Long maintainerId,
+                     Pageable pageable);
 
-    Page<Facility> findByCategory(String category, Pageable pageable);
+       // 分页查询所有设施
+       Page<Facility> findByStatus(String status, Pageable pageable);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT f FROM Facility f WHERE f.id = :id")
-    Optional<Facility> findByIdWithLock(@Param("id") Long id);
+       // 分页查询所有设施
+       Page<Facility> findByCategory(String category, Pageable pageable);
+
+       // 分页查询所有设施
+       @Lock(LockModeType.PESSIMISTIC_WRITE)
+       @Query("SELECT f FROM Facility f WHERE f.id = :id")
+       Optional<Facility> findByIdWithLock(@Param("id") Long id);
 }

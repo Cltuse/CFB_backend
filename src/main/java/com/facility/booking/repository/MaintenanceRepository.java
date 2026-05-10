@@ -10,37 +10,51 @@ import java.util.List;
 
 @Repository
 public interface MaintenanceRepository extends JpaRepository<Maintenance, Long> {
+    // 维计类型视图
     interface TypeCountView {
         String getMaintenanceType();
+
         Long getTotal();
     }
 
+    // 维计类型视图-平均持续视图
     interface TypeDurationView {
         String getMaintenanceType();
+
         Double getAvgDuration();
     }
 
+    // 维计设施视图
     interface FacilityFaultView {
         Long getFacilityId();
+
         String getFacilityName();
+
         Long getFaultCount();
     }
 
+    // 根据设施ID查询所有维护记录
     List<Maintenance> findByFacilityId(Long facilityId);
 
+    // 根据状态查询所有维护记录
     List<Maintenance> findByStatus(String status);
-    
+
+    // 根据维护人ID查询所有维护记录
     List<Maintenance> findByMaintainerId(Long maintainerId);
 
+    // 根据创建时间查询所有维护记录
     List<Maintenance> findByCreatedAtAfter(LocalDateTime startTime);
 
+    // 根据状态查询所有维护记录数量
     long countByStatus(String status);
 
+    // 根据类型查询所有维护记录数量
     @Query("SELECT COALESCE(m.maintenanceType, 'OTHER') AS maintenanceType, COUNT(m) AS total " +
             "FROM Maintenance m WHERE m.createdAt >= :startTime " +
             "GROUP BY COALESCE(m.maintenanceType, 'OTHER')")
     List<TypeCountView> countByTypeAfter(@Param("startTime") LocalDateTime startTime);
 
+    // 根据类型查询所有维护记录平均持续时间
     @Query(value = """
             SELECT COALESCE(maintenance_type, 'OTHER') AS maintenanceType,
                    AVG(TIMESTAMPDIFF(HOUR, start_time, end_time)) AS avgDuration
@@ -53,6 +67,7 @@ public interface MaintenanceRepository extends JpaRepository<Maintenance, Long> 
             """, nativeQuery = true)
     List<TypeDurationView> averageDurationByTypeAfter(@Param("startTime") LocalDateTime startTime);
 
+    // 根据设施ID查询所有维护记录数量
     @Query(value = """
             SELECT m.facility_id AS facilityId,
                    COALESCE(f.name, 'Unknown facility') AS facilityName,
@@ -65,7 +80,8 @@ public interface MaintenanceRepository extends JpaRepository<Maintenance, Long> 
             LIMIT :limit
             """, nativeQuery = true)
     List<FacilityFaultView> findTopFacilityFaultsAfter(@Param("startTime") LocalDateTime startTime,
-                                                       @Param("limit") int limit);
+            @Param("limit") int limit);
 
+    // 根据状态查询所有维护记录数量
     List<Maintenance> findByStatusAndStartTimeLessThanEqual(String status, LocalDateTime latestStartTime);
 }

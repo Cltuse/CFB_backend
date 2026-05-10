@@ -3,6 +3,7 @@ package com.facility.booking.dto.auth;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
+// 认证响应DTO
 @Data
 @AllArgsConstructor
 public class AuthResponse {
@@ -10,6 +11,7 @@ public class AuthResponse {
     private Long expiresIn;
     private UserProfile user;
 
+    // 用户信息DTO
     @Data
     @AllArgsConstructor
     public static class UserProfile {

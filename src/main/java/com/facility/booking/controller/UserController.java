@@ -63,8 +63,7 @@ public class UserController {
             PasswordEncoder passwordEncoder,
             CurrentUserService currentUserService,
             FacilityRepository facilityRepository,
-            ReservationRepository reservationRepository
-    ) {
+            ReservationRepository reservationRepository) {
         this.userRepository = userRepository;
         this.violationRecordService = violationRecordService;
         this.jwtTokenProvider = jwtTokenProvider;
@@ -74,9 +73,22 @@ public class UserController {
         this.reservationRepository = reservationRepository;
     }
 
+    /**
+     * 用户登录
+     * 
+     * @param request 登录请求
+     * @return 登录响应
+     * @throws IllegalArgumentException 如果用户名或密码错误
+     * @throws IllegalArgumentException 如果用户未激活
+     * @throws IllegalArgumentException 如果用户已被禁用
+     * @throws IllegalArgumentException 如果用户已被删除
+     *                                  JwtTokenProvider 生成 JWT 令牌
+     */
+
     @PostMapping("/login")
     public Result<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         String username = request.getUsername() == null ? null : request.getUsername().trim();
+        // 根据用户名查询用户 data jpa
         Optional<User> userOpt = userRepository.findByUsername(username);
         if (userOpt.isEmpty()) {
             return Result.error("用户名或密码错误");
@@ -87,10 +99,18 @@ public class UserController {
             return Result.error("用户名或密码错误");
         }
 
+        // 遗留密码升级
         upgradeLegacyPasswordIfNecessary(request.getPassword(), user);
+        // 生成 JWT 令牌
         return Result.success("登录成功", buildAuthResponse(user));
     }
 
+    /**
+     * 用户注册
+     * 
+     * @param request 注册请求
+     * @return 注册响应
+     */
     @PostMapping("/register")
     public Result<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
         if (userRepository.findByUsername(request.getUsername()).isPresent()) {
@@ -119,14 +139,12 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN')")
     public Result<Page<User>> list(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size
-    ) {
+            @RequestParam(defaultValue = "10") int size) {
         try {
             PageRequest pageRequest = PageRequest.of(
                     Math.max(page, 0),
                     PageUtils.normalizeSize(size),
-                    Sort.by(Sort.Direction.DESC, "id")
-            );
+                    Sort.by(Sort.Direction.DESC, "id"));
             Page<User> users = userRepository.findAll(pageRequest);
             return Result.success(users.map(this::toSafeUser));
         } catch (Exception e) {
@@ -423,14 +441,21 @@ public class UserController {
         return password.startsWith("$2a$") || password.startsWith("$2b$") || password.startsWith("$2y$");
     }
 
+    /**
+     * 构建认证响应
+     * 
+     * @param user 用户
+     * @return 认证响应
+     * 
+     */
     private AuthResponse buildAuthResponse(User user) {
+        // 构建用户主身份
         CustomUserPrincipal principal = new CustomUserPrincipal(
                 user.getId(),
                 user.getUsername(),
                 user.getRealName(),
                 user.getRole(),
-                user.getStatus()
-        );
+                user.getStatus());
         return new AuthResponse(
                 jwtTokenProvider.generateToken(principal),
                 jwtTokenProvider.getExpirationMillis(),
@@ -442,8 +467,6 @@ public class UserController {
                         user.getPhone(),
                         user.getEmail(),
                         user.getAvatar(),
-                        user.getStatus()
-                )
-        );
+                        user.getStatus()));
     }
 }
