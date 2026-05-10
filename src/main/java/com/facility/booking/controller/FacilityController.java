@@ -42,6 +42,11 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/facility")
 public class FacilityController {
 
+    /**
+     * 设施仓库
+     * 
+     * @param facilityRepository 设施仓库
+     */
     private final FacilityRepository facilityRepository;
     private final ReservationRepository reservationRepository;
     private final UserRepository userRepository;
@@ -53,8 +58,7 @@ public class FacilityController {
             ReservationRepository reservationRepository,
             UserRepository userRepository,
             FileUploadService fileUploadService,
-            CurrentUserService currentUserService
-    ) {
+            CurrentUserService currentUserService) {
         this.facilityRepository = facilityRepository;
         this.reservationRepository = reservationRepository;
         this.userRepository = userRepository;
@@ -62,6 +66,11 @@ public class FacilityController {
         this.currentUserService = currentUserService;
     }
 
+    /**
+     * 查询所有设施
+     * 
+     * @return 所有设施列表
+     */
     @GetMapping("/list")
     public Result<List<Facility>> list() {
         List<Facility> facilities = filterFacilitiesForCurrentMaintainer(facilityRepository.findAll());
@@ -69,6 +78,11 @@ public class FacilityController {
         return Result.success(facilities);
     }
 
+    /**
+     * 查询当前设施管理员负责的设施
+     * 
+     * @return 当前设施管理员负责的设施列表
+     */
     @GetMapping("/mine")
     public Result<List<Facility>> mine() {
         Long currentUserId = currentUserService.getCurrentUserId();
@@ -81,6 +95,12 @@ public class FacilityController {
         return Result.success(facilities);
     }
 
+    /**
+     * 根据设施管理员ID查询设施
+     * 
+     * @param maintainerId 设施管理员ID
+     * @return 设施列表
+     */
     @GetMapping("/maintainer/{maintainerId}")
     public Result<List<Facility>> getByMaintainerId(@PathVariable Long maintainerId) {
         if (currentUserService.hasRole("MAINTAINER")) {
@@ -95,6 +115,11 @@ public class FacilityController {
         return Result.success(facilities);
     }
 
+    /**
+     * 查询所有设施的可用状态
+     * 
+     * @return 所有设施的可用状态列表
+     */
     @GetMapping("/available")
     public Result<List<Facility>> getAvailable() {
         List<Facility> facilities = facilityRepository.findByStatus("AVAILABLE");
@@ -102,6 +127,12 @@ public class FacilityController {
         return Result.success(facilities);
     }
 
+    /**
+     * 根据ID查询设施
+     * 
+     * @param id 设施ID
+     * @return 设施详情
+     */
     @GetMapping("/{id}")
     public Result<Facility> getById(@PathVariable Long id) {
         Optional<Facility> facilityOpt = facilityRepository.findById(id);
@@ -117,11 +148,17 @@ public class FacilityController {
         return Result.success(facility);
     }
 
+    /**
+     * 查询设施的详细信息
+     * 
+     * @param id   设施ID
+     * @param days 时间范围（天）
+     * @return 设施的详细信息
+     */
     @GetMapping("/{id}/detail")
     public Result<Map<String, Object>> getFacilityDetail(
             @PathVariable Long id,
-            @RequestParam(defaultValue = "7") int days
-    ) {
+            @RequestParam(defaultValue = "7") int days) {
         Optional<Facility> facilityOpt = facilityRepository.findById(id);
         if (facilityOpt.isEmpty()) {
             return Result.error("设施不存在");
@@ -138,10 +175,10 @@ public class FacilityController {
         LocalDateTime endDate = now.plusDays(days);
         List<Reservation> reservations = reservationRepository.findByFacilityId(id);
         Map<Long, User> usersById = userRepository.findAllById(
-                        reservations.stream()
-                                .map(Reservation::getUserId)
-                                .filter(Objects::nonNull)
-                                .collect(Collectors.toSet()))
+                reservations.stream()
+                        .map(Reservation::getUserId)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet()))
                 .stream()
                 .collect(Collectors.toMap(User::getId, user -> user));
 
@@ -174,6 +211,12 @@ public class FacilityController {
         return Result.success(response);
     }
 
+    /**
+     * 搜索设施（模糊查询）
+     * 
+     * @param keyword 搜索关键词
+     * @return 符合条件的设施列表
+     */
     @GetMapping("/search")
     public Result<List<Facility>> search(@RequestParam String keyword) {
         String normalizedKeyword = keyword == null ? "" : keyword.trim();
@@ -190,8 +233,7 @@ public class FacilityController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir
-    ) {
+            @RequestParam(defaultValue = "desc") String sortDir) {
         Sort.Direction direction = "desc".equalsIgnoreCase(sortDir) ? Sort.Direction.DESC : Sort.Direction.ASC;
         Pageable pageable = PageUtils.of(page, size, Sort.by(direction, sortBy));
 
@@ -214,8 +256,7 @@ public class FacilityController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir
-    ) {
+            @RequestParam(defaultValue = "desc") String sortDir) {
         Sort.Direction direction = "desc".equalsIgnoreCase(sortDir) ? Sort.Direction.DESC : Sort.Direction.ASC;
         Pageable pageable = PageUtils.of(page, size, Sort.by(direction, sortBy));
         String normalizedKeyword = keyword == null ? "" : keyword.trim();
@@ -223,7 +264,8 @@ public class FacilityController {
         Page<Facility> facilityPage;
         Long currentUserId = currentUserService.getCurrentUserId();
         if (currentUserService.hasRole("MAINTAINER") && currentUserId != null) {
-            facilityPage = facilityRepository.searchByKeywordAndMaintainerId(normalizedKeyword, currentUserId, pageable);
+            facilityPage = facilityRepository.searchByKeywordAndMaintainerId(normalizedKeyword, currentUserId,
+                    pageable);
         } else {
             facilityPage = facilityRepository.searchByKeyword(normalizedKeyword, pageable);
         }
@@ -233,6 +275,12 @@ public class FacilityController {
         return Result.success(toPageResult(facilityPage, facilities));
     }
 
+    /**
+     * 创建设施
+     * 
+     * @param facility 设施信息
+     * @return 创建的设施信息
+     */
     @PostMapping
     @OperationLog(operationType = "CREATE_FACILITY", detail = "创建设施")
     public Result<Facility> create(@RequestBody Facility facility) {
@@ -254,12 +302,19 @@ public class FacilityController {
         return Result.success("创建成功", savedFacility);
     }
 
+    /**
+     * 创建设施（包含图片）
+     * 
+     * @param facility  设施信息
+     * @param imageFile 设施图片文件
+     * @return 创建的设施信息
+     * @throws Exception 如果创建失败
+     */
     @PostMapping(consumes = "multipart/form-data")
     @OperationLog(operationType = "CREATE_FACILITY", detail = "创建设施")
     public Result<Facility> createWithImage(
             @RequestPart("facility") Facility facility,
-            @RequestPart(value = "image", required = false) MultipartFile imageFile
-    ) {
+            @RequestPart(value = "image", required = false) MultipartFile imageFile) {
         if (!currentUserService.hasRole("ADMIN")) {
             return Result.error(403, "仅系统管理员可创建设施");
         }
@@ -287,6 +342,14 @@ public class FacilityController {
         }
     }
 
+    /**
+     * 上传设施图片
+     * 
+     * @param id   设施ID
+     * @param file 设施图片文件
+     * @return 上传后的设施信息
+     * @throws Exception 如果上传失败
+     */
     @PostMapping("/{id}/image")
     @OperationLog(operationType = "UPLOAD_FACILITY_IMAGE", detail = "上传设施图片")
     public Result<Facility> uploadImage(@PathVariable Long id, @RequestParam("file") MultipartFile file) {
@@ -318,6 +381,13 @@ public class FacilityController {
         }
     }
 
+    /**
+     * 删除设施图片
+     * 
+     * @param id 设施ID
+     * @return 删除后的设施信息
+     * @throws Exception 如果删除失败
+     */
     @DeleteMapping("/{id}/image")
     @OperationLog(operationType = "DELETE_FACILITY_IMAGE", detail = "删除设施图片")
     public Result<Facility> deleteImage(@PathVariable Long id) {
@@ -341,6 +411,14 @@ public class FacilityController {
         return Result.success("图片删除成功", savedFacility);
     }
 
+    /**
+     * 更新设施
+     * 
+     * @param id       设施ID
+     * @param facility 更新后的设施信息
+     * @return 更新后的设施信息
+     * @throws Exception 如果更新失败
+     */
     @PutMapping("/{id}")
     @OperationLog(operationType = "UPDATE_FACILITY", detail = "更新设施")
     public Result<Facility> update(@PathVariable Long id, @RequestBody Facility facility) {
@@ -395,6 +473,14 @@ public class FacilityController {
         return Result.success("更新成功", savedFacility);
     }
 
+    /**
+     * 更新设施状态
+     * 
+     * @param id          设施ID
+     * @param requestBody 包含状态的请求体
+     * @return 更新后的设施信息
+     * @throws Exception 如果更新失败
+     */
     @PutMapping("/{id}/status")
     @OperationLog(operationType = "UPDATE_FACILITY_STATUS", detail = "更新设施状态")
     public Result<Facility> updateStatus(@PathVariable Long id, @RequestBody Map<String, String> requestBody) {
@@ -422,6 +508,13 @@ public class FacilityController {
         return Result.success("设施状态更新成功", savedFacility);
     }
 
+    /**
+     * 删除设施
+     * 
+     * @param id 设施ID
+     * @return 删除后的设施信息
+     * @throws Exception 如果删除失败
+     */
     @DeleteMapping("/{id}")
     @OperationLog(operationType = "DELETE_FACILITY", detail = "删除设施")
     public Result<Void> delete(@PathVariable Long id) {
@@ -446,6 +539,13 @@ public class FacilityController {
         return Result.success("删除成功", null);
     }
 
+    /**
+     * 将分页结果转换为响应格式
+     * 
+     * @param facilityPage 分页设施结果
+     * @param facilities   分页设施列表
+     * @return 分页结果响应
+     */
     private Map<String, Object> toPageResult(Page<Facility> facilityPage, List<Facility> facilities) {
         Map<String, Object> response = new HashMap<>();
         response.put("content", facilities);
@@ -458,6 +558,12 @@ public class FacilityController {
         return response;
     }
 
+    /**
+     * 过滤设施列表，仅返回当前用户负责的设施
+     * 
+     * @param facilities 所有设施列表
+     * @return 过滤后的设施列表
+     */
     private List<Facility> filterFacilitiesForCurrentMaintainer(List<Facility> facilities) {
         if (!currentUserService.hasRole("MAINTAINER")) {
             return facilities;
@@ -473,6 +579,12 @@ public class FacilityController {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 检查当前用户是否有访问该设施的权限
+     * 
+     * @param facility 设施
+     * @return 是否有访问权限
+     */
     private boolean canCurrentMaintainerAccessFacility(Facility facility) {
         if (!currentUserService.hasRole("MAINTAINER")) {
             return true;
@@ -481,6 +593,12 @@ public class FacilityController {
         return currentUserId != null && Objects.equals(currentUserId, facility.getMaintainerId());
     }
 
+    /**
+     * 验证设施负责人绑定关系
+     * 
+     * @param maintainerId 设施负责人ID
+     * @return 验证结果
+     */
     private String validateMaintainerBinding(Long maintainerId) {
         if (maintainerId == null) {
             return null;
@@ -496,6 +614,13 @@ public class FacilityController {
         return null;
     }
 
+    /**
+     * 检查设施是否匹配关键词
+     * 
+     * @param facility 设施
+     * @param keyword  搜索关键词
+     * @return 是否匹配关键词
+     */
     private boolean matchesKeyword(Facility facility, String keyword) {
         if (keyword == null || keyword.isBlank()) {
             return true;
@@ -508,10 +633,22 @@ public class FacilityController {
                 || containsIgnoreCase(facility.getLocation(), normalized);
     }
 
+    /**
+     * 检查字符串是否包含指定子字符串
+     * 
+     * @param value   要检查的字符串
+     * @param keyword 子字符串
+     * @return 是否包含子字符串（不区分大小写）
+     */
     private boolean containsIgnoreCase(String value, String keyword) {
         return value != null && value.toLowerCase().contains(keyword);
     }
 
+    /**
+     * 为设施列表添加负责人名称
+     * 
+     * @param facilities 设施列表
+     */
     private void enrichFacilities(List<Facility> facilities) {
         if (facilities == null || facilities.isEmpty()) {
             return;
@@ -531,6 +668,11 @@ public class FacilityController {
         }
     }
 
+    /**
+     * 为设施添加负责人名称
+     * 
+     * @param facility 设施
+     */
     private void enrichFacility(Facility facility) {
         if (facility == null || facility.getMaintainerId() == null) {
             return;
@@ -540,6 +682,12 @@ public class FacilityController {
         userOpt.ifPresent(user -> facility.setMaintainerName(getDisplayName(user)));
     }
 
+    /**
+     * 为设施添加负责人名称
+     * 
+     * @param facility  设施
+     * @param usersById 所有用户映射表
+     */
     private void fillMaintainerName(Facility facility, Map<Long, User> usersById) {
         if (facility.getMaintainerId() == null) {
             facility.setMaintainerName(null);
@@ -552,6 +700,12 @@ public class FacilityController {
         }
     }
 
+    /**
+     * 获取用户显示名称（优先使用真实姓名，否则使用用户名）
+     * 
+     * @param user 用户
+     * @return 用户显示名称
+     */
     private String getDisplayName(User user) {
         if (user.getRealName() != null && !user.getRealName().isBlank()) {
             return user.getRealName();

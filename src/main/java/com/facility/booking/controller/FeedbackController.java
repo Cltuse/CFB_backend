@@ -26,6 +26,9 @@ public class FeedbackController {
 
     /**
      * 提交反馈
+     * 
+     * @param feedback 反馈内容
+     * @return 反馈提交结果
      */
     @PostMapping("/submit")
     public Result submitFeedback(@RequestBody Feedback feedback) {
@@ -39,11 +42,16 @@ public class FeedbackController {
 
     /**
      * 获取用户的反馈列表
+     * 
+     * @param userId 用户ID
+     * @param page   页码
+     * @param size   每页数量
+     * @return 用户反馈列表结果
      */
     @GetMapping("/user/{userId}")
     public Result getUserFeedbacks(@PathVariable Long userId,
-                                   @RequestParam(defaultValue = "0") int page,
-                                   @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
         try {
             Pageable pageable = PageUtils.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
             Page<Feedback> feedbacks = feedbackService.getUserFeedbacks(userId, pageable);
@@ -55,6 +63,9 @@ public class FeedbackController {
 
     /**
      * 获取反馈详情
+     * 
+     * @param id 反馈ID
+     * @return 反馈详情
      */
     @GetMapping("/{id}")
     public Result getFeedbackDetail(@PathVariable Long id) {
@@ -72,12 +83,18 @@ public class FeedbackController {
 
     /**
      * 搜索用户的反馈
+     * 
+     * @param userId  用户ID
+     * @param keyword 搜索关键词
+     * @param page    页码
+     * @param size    每页数量
+     * @return 搜索结果列表
      */
     @GetMapping("/user/{userId}/search")
     public Result searchUserFeedbacks(@PathVariable Long userId,
-                                      @RequestParam String keyword,
-                                      @RequestParam(defaultValue = "0") int page,
-                                      @RequestParam(defaultValue = "10") int size) {
+            @RequestParam String keyword,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
         try {
             Pageable pageable = PageUtils.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
             Page<Feedback> feedbacks = feedbackService.searchUserFeedbacks(userId, keyword, pageable);
@@ -89,11 +106,15 @@ public class FeedbackController {
 
     /**
      * 管理员回复反馈
+     * 
+     * @param id    反馈ID
+     * @param reply 回复内容
+     * @return 回复结果
      */
     @PostMapping("/{id}/reply")
     @OperationLog(operationType = "REPLY_FEEDBACK", detail = "回复反馈")
     public Result replyFeedback(@PathVariable Long id,
-                               @RequestParam String reply) {
+            @RequestParam String reply) {
         try {
             Long adminId = currentUserService.getCurrentUserId();
             if (adminId == null) {
@@ -112,6 +133,8 @@ public class FeedbackController {
 
     /**
      * 获取待处理反馈数量
+     * 
+     * @return 待处理反馈数量
      */
     @GetMapping("/pending/count")
     public Result getPendingFeedbackCount() {
@@ -122,9 +145,16 @@ public class FeedbackController {
             return Result.error("获取待处理反馈数量失败: " + e.getMessage());
         }
     }
-    
+
     /**
      * 管理员获取所有反馈
+     * 
+     * @param page    页码
+     * @param size    每页数量
+     * @param status  状态（可选）
+     * @param type    类型（可选）
+     * @param keyword 搜索关键词（可选）
+     * @return 所有反馈列表
      */
     @GetMapping("/list")
     public Result getAllFeedbacks(
@@ -134,14 +164,15 @@ public class FeedbackController {
             @RequestParam(required = false) String type,
             @RequestParam(required = false) String keyword) {
         try {
-            System.out.println("Getting feedbacks with params: page=" + page + ", size=" + size + 
-                              ", status=" + status + ", type=" + type + ", keyword=" + keyword);
-                              
+            System.out.println("Getting feedbacks with params: page=" + page + ", size=" + size +
+                    ", status=" + status + ", type=" + type + ", keyword=" + keyword);
+
             Pageable pageable = PageUtils.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
             Page<Feedback> feedbacks;
-            
+
             // 根据参数组合查询
-            if (status != null && !status.isEmpty() && type != null && !type.isEmpty() && keyword != null && !keyword.isEmpty()) {
+            if (status != null && !status.isEmpty() && type != null && !type.isEmpty() && keyword != null
+                    && !keyword.isEmpty()) {
                 feedbacks = feedbackService.searchFeedbacksByStatusAndTypeAndKeyword(status, type, keyword, pageable);
             } else if (status != null && !status.isEmpty() && type != null && !type.isEmpty()) {
                 feedbacks = feedbackService.getFeedbacksByStatusAndType(status, type, pageable);
@@ -158,16 +189,20 @@ public class FeedbackController {
             } else {
                 feedbacks = feedbackService.getAllFeedbacks(pageable);
             }
-            
+
             return Result.success("获取反馈列表成功", feedbacks);
         } catch (Exception e) {
             e.printStackTrace();
             return Result.error("获取反馈列表失败: " + e.getMessage());
         }
     }
-    
+
     /**
      * 更新反馈状态
+     * 
+     * @param id     反馈ID
+     * @param status 新状态
+     * @return 更新结果
      */
     @PutMapping("/{id}/status")
     @OperationLog(operationType = "UPDATE_FEEDBACK_STATUS", detail = "更新反馈状态")
@@ -186,9 +221,12 @@ public class FeedbackController {
             return Result.error("更新反馈状态失败: " + e.getMessage());
         }
     }
-    
+
     /**
      * 删除反馈
+     * 
+     * @param id 反馈ID
+     * @return 删除结果
      */
     @DeleteMapping("/{id}")
     @OperationLog(operationType = "DELETE_FEEDBACK", detail = "删除反馈")

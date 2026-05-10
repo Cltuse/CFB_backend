@@ -28,6 +28,9 @@ public class FileController {
 
     /**
      * 上传设施图片
+     * 
+     * @param file 上传的文件
+     * @return 上传结果
      */
     @PostMapping("/upload/facility")
     public Result<String> uploadFacilityImage(@RequestParam("file") MultipartFile file) {
@@ -44,7 +47,7 @@ public class FileController {
 
             String fileUrl = fileUploadService.uploadFile(file, "facility");
             return Result.success("上传成功", fileUrl);
-            
+
         } catch (Exception e) {
             return Result.error("文件上传失败: " + e.getMessage());
         }
@@ -52,6 +55,9 @@ public class FileController {
 
     /**
      * 上传用户头像
+     * 
+     * @param file 上传的文件
+     * @return 上传结果
      */
     @PostMapping("/upload/avatar")
     public Result<String> uploadAvatar(@RequestParam("file") MultipartFile file) {
@@ -68,7 +74,7 @@ public class FileController {
 
             String fileUrl = fileUploadService.uploadFile(file, "user");
             return Result.success("上传成功", fileUrl);
-            
+
         } catch (Exception e) {
             return Result.error("文件上传失败: " + e.getMessage());
         }
@@ -76,6 +82,9 @@ public class FileController {
 
     /**
      * 删除文件
+     * 
+     * @param fileUrl 文件URL
+     * @return 删除结果
      */
     @DeleteMapping("/delete")
     public Result<Void> deleteFile(@RequestParam("fileUrl") String fileUrl) {

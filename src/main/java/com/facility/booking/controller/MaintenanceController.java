@@ -44,18 +44,30 @@ public class MaintenanceController {
     private final UserRepository userRepository;
     private final CurrentUserService currentUserService;
 
+    /**
+     * 构造函数
+     * 
+     * @param maintenanceRepository 维护记录仓库
+     * @param facilityRepository    设施仓库
+     * @param userRepository        用户仓库
+     * @param currentUserService    当前用户服务
+     */
     public MaintenanceController(
             MaintenanceRepository maintenanceRepository,
             FacilityRepository facilityRepository,
             UserRepository userRepository,
-            CurrentUserService currentUserService
-    ) {
+            CurrentUserService currentUserService) {
         this.maintenanceRepository = maintenanceRepository;
         this.facilityRepository = facilityRepository;
         this.userRepository = userRepository;
         this.currentUserService = currentUserService;
     }
 
+    /**
+     * 获取当前设施管理员的维护记录列表
+     * 
+     * @return 维护记录列表
+     */
     @GetMapping("/list")
     public Result<List<Maintenance>> list() {
         List<Maintenance> maintenances = filterMaintenancesForCurrentMaintainer(maintenanceRepository.findAll());
@@ -63,7 +75,12 @@ public class MaintenanceController {
         return Result.success(maintenances);
     }
 
-    @GetMapping("/facility/{facilityId}")
+    /**
+     * 获取指定设施的维护记录列表
+     * 
+     * @param facilityId 设施ID
+     * @return 维护记录列表
+     */
     public Result<List<Maintenance>> getByfacilityId(@PathVariable Long facilityId) {
         if (!canCurrentMaintainerAccessFacility(facilityId)) {
             return Result.error(403, "无权查看该设施的维护记录");
@@ -74,6 +91,12 @@ public class MaintenanceController {
         return Result.success(maintenances);
     }
 
+    /**
+     * 获取指定设施管理员的维护记录列表
+     * 
+     * @param maintainerId 设施管理员ID
+     * @return 维护记录列表
+     */
     @GetMapping("/maintainer/{maintainerId}")
     public Result<List<Maintenance>> getByMaintainerId(@PathVariable Long maintainerId) {
         List<Maintenance> maintenances;
@@ -91,6 +114,12 @@ public class MaintenanceController {
         return Result.success(maintenances);
     }
 
+    /**
+     * 获取指定维护记录的详细信息
+     * 
+     * @param id 维护记录ID
+     * @return 维护记录详情
+     */
     @GetMapping("/{id}")
     public Result<Maintenance> getById(@PathVariable Long id) {
         Optional<Maintenance> maintenanceOpt = maintenanceRepository.findById(id);
@@ -107,6 +136,12 @@ public class MaintenanceController {
         return Result.success(maintenance);
     }
 
+    /**
+     * 创建新的维护任务
+     * 
+     * @param maintenance 维护任务对象
+     * @return 创建的维护任务详情
+     */
     @PostMapping
     @OperationLog(operationType = "CREATE_MAINTENANCE", detail = "创建维护任务")
     public Result<Maintenance> create(@RequestBody Maintenance maintenance) {
@@ -143,6 +178,13 @@ public class MaintenanceController {
         return Result.success("创建成功", savedMaintenance);
     }
 
+    /**
+     * 更新指定维护任务
+     * 
+     * @param id          维护记录ID
+     * @param maintenance 更新后的维护任务对象
+     * @return 更新后的维护任务详情
+     */
     @PutMapping("/{id}")
     @OperationLog(operationType = "UPDATE_MAINTENANCE", detail = "更新维护任务")
     public Result<Maintenance> update(@PathVariable Long id, @RequestBody Maintenance maintenance) {
@@ -156,7 +198,8 @@ public class MaintenanceController {
             return Result.error(403, "无权编辑该维护记录");
         }
 
-        Long targetFacilityId = maintenance.getFacilityId() != null ? maintenance.getFacilityId() : existing.getFacilityId();
+        Long targetFacilityId = maintenance.getFacilityId() != null ? maintenance.getFacilityId()
+                : existing.getFacilityId();
         if (!canCurrentMaintainerAccessFacility(targetFacilityId)) {
             return Result.error(403, "无权将维护记录关联到该设施");
         }
@@ -211,6 +254,13 @@ public class MaintenanceController {
         return Result.success("更新成功", savedMaintenance);
     }
 
+    /**
+     * 完成指定维护任务
+     * 
+     * @param id          维护记录ID
+     * @param maintenance 完成后的维护任务对象
+     * @return 完成后的维护任务详情
+     */
     @PutMapping("/{id}/complete")
     @OperationLog(operationType = "COMPLETE_MAINTENANCE", detail = "完成维护")
     public Result<Maintenance> complete(@PathVariable Long id, @RequestBody Maintenance maintenance) {
@@ -251,6 +301,12 @@ public class MaintenanceController {
         return Result.success("维护任务已完成", savedMaintenance);
     }
 
+    /**
+     * 删除指定维护任务
+     * 
+     * @param id 维护记录ID
+     * @return 删除后的响应
+     */
     @DeleteMapping("/{id}")
     @OperationLog(operationType = "DELETE_MAINTENANCE", detail = "删除维护任务")
     public Result<Void> delete(@PathVariable Long id) {
@@ -269,6 +325,12 @@ public class MaintenanceController {
         return Result.success("删除成功", null);
     }
 
+    /**
+     * 获取指定时间范围内的维护记录统计信息
+     * 
+     * @param range 时间范围（格式："1d"、"1w"、"1m"、"1y"）
+     * @return 维护记录统计信息
+     */
     @GetMapping("/stats/time-range")
     public Result<Map<String, Object>> getStatsByTimeRange(@RequestParam String range) {
         LocalDateTime startTime = getStartTimeByRange(range);
@@ -281,6 +343,12 @@ public class MaintenanceController {
         return Result.success(result);
     }
 
+    /**
+     * 获取指定时间范围内的维护记录类型分布统计信息
+     * 
+     * @param range 时间范围（格式："1d"、"1w"、"1m"、"1y"）
+     * @return 维护记录类型分布统计信息
+     */
     @GetMapping("/stats/type-distribution")
     public Result<Map<String, Object>> getTypeDistribution(@RequestParam(required = false) String range) {
         LocalDateTime startTime = range != null ? getStartTimeByRange(range) : null;
@@ -297,8 +365,8 @@ public class MaintenanceController {
             typeCount.put(normalizedType, typeCount.getOrDefault(normalizedType, 0L) + 1);
         }
 
-        String[] colors = {"#409eff", "#67c23a", "#e6a23c", "#909399"};
-        String[] typeNames = {"日常保养", "故障维修", "设备升级", "其他"};
+        String[] colors = { "#409eff", "#67c23a", "#e6a23c", "#909399" };
+        String[] typeNames = { "日常保养", "故障维修", "设备升级", "其他" };
         List<Map<String, Object>> pieData = new ArrayList<>();
         int index = 0;
         for (Map.Entry<String, Long> entry : typeCount.entrySet()) {
@@ -317,6 +385,12 @@ public class MaintenanceController {
         return Result.success(result);
     }
 
+    /**
+     * 获取指定时间范围内的维护记录持续时间统计信息
+     * 
+     * @param range 时间范围（格式："1d"、"1w"、"1m"、"1y"）
+     * @return 维护记录持续时间统计信息
+     */
     @GetMapping("/stats/duration")
     public Result<Map<String, Object>> getDurationStats(@RequestParam(required = false) String range) {
         LocalDateTime startTime = range != null ? getStartTimeByRange(range) : null;
@@ -337,8 +411,8 @@ public class MaintenanceController {
             durationBuckets.get(normalizedType).add(hours);
         }
 
-        String[] typeNames = {"日常保养", "故障维修", "设备升级", "其他"};
-        String[] types = {"ROUTINE", "REPAIR", "UPGRADE", "OTHER"};
+        String[] typeNames = { "日常保养", "故障维修", "设备升级", "其他" };
+        String[] types = { "ROUTINE", "REPAIR", "UPGRADE", "OTHER" };
         List<Map<String, Object>> barData = new ArrayList<>();
 
         for (int i = 0; i < types.length; i++) {
@@ -357,6 +431,12 @@ public class MaintenanceController {
         return Result.success(result);
     }
 
+    /**
+     * 获取指定时间范围内的维护记录故障统计信息
+     * 
+     * @param range 时间范围（格式："1d"、"1w"、"1m"、"1y"）
+     * @return 维护记录故障统计信息
+     */
     @GetMapping("/stats/facility-faults")
     public Result<Map<String, Object>> getFacilityFaultStats(@RequestParam(required = false) String range) {
         LocalDateTime startTime = range != null ? getStartTimeByRange(range) : null;
@@ -388,6 +468,11 @@ public class MaintenanceController {
         return Result.success(result);
     }
 
+    /**
+     * 获取维护记录摘要统计信息
+     * 
+     * @return 维护记录摘要统计信息
+     */
     @GetMapping("/stats/summary")
     public Result<Map<String, Object>> getSummaryStats() {
         List<Maintenance> maintenances = getScopedMaintenances(null);
@@ -407,6 +492,9 @@ public class MaintenanceController {
         return Result.success(result);
     }
 
+    /**
+     * 检查并更新待处理维护记录的状态
+     */
     @Scheduled(cron = "0 */15 * * * ?")
     public void checkPendingMaintenances() {
         LocalDateTime now = LocalDateTime.now();
@@ -420,6 +508,13 @@ public class MaintenanceController {
         }
     }
 
+    /**
+     * 根据时间更新维护记录的状态
+     * 
+     * @param maintenance 维护记录
+     * @return 更新后的维护记录
+     * 
+     */
     private void normalizeMaintenanceStatusByTime(Maintenance maintenance) {
         if (maintenance == null || !"PENDING".equals(maintenance.getStatus()) || maintenance.getStartTime() == null) {
             return;
@@ -431,6 +526,12 @@ public class MaintenanceController {
         }
     }
 
+    /**
+     * 验证维护记录是否符合要求
+     * 
+     * @param maintenance 维护记录
+     * @return 验证结果（null表示验证通过）
+     */
     private String validateMaintenance(Maintenance maintenance) {
         if (maintenance.getMaintainerId() == null) {
             return "维护人员ID不能为空";
@@ -448,6 +549,12 @@ public class MaintenanceController {
         return null;
     }
 
+    /**
+     * 获取指定时间范围内的维护记录
+     * 
+     * @param startTime 开始时间（可选）
+     * @return 维护记录列表
+     */
     private List<Maintenance> getScopedMaintenances(LocalDateTime startTime) {
         List<Maintenance> maintenances = startTime == null
                 ? maintenanceRepository.findAll()
@@ -455,6 +562,11 @@ public class MaintenanceController {
         return filterMaintenancesForCurrentMaintainer(maintenances);
     }
 
+    /**
+     * 获取当前维护人员负责的设施列表
+     * 
+     * @return 维护人员负责的设施列表
+     */
     private List<Facility> getScopedFacilities() {
         if (!currentUserService.hasRole("MAINTAINER")) {
             return facilityRepository.findAll();
@@ -467,6 +579,12 @@ public class MaintenanceController {
         return facilityRepository.findByMaintainerId(currentUserId);
     }
 
+    /**
+     * 过滤出当前维护人员负责的设施记录
+     * 
+     * @param maintenances 所有维护记录
+     * @return 过滤后的维护记录列表
+     */
     private List<Maintenance> filterMaintenancesForCurrentMaintainer(List<Maintenance> maintenances) {
         if (!currentUserService.hasRole("MAINTAINER")) {
             return maintenances;
@@ -481,6 +599,12 @@ public class MaintenanceController {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 检查当前维护人员是否有访问指定设施的权限
+     * 
+     * @param facilityId 设施ID
+     * @return 是否有访问权限
+     */
     private boolean canCurrentMaintainerAccessFacility(Long facilityId) {
         if (!currentUserService.hasRole("MAINTAINER")) {
             return true;
@@ -498,24 +622,30 @@ public class MaintenanceController {
         return facilityOpt.isPresent() && Objects.equals(facilityOpt.get().getMaintainerId(), currentUserId);
     }
 
+    /**
+     * 填充维护记录的设施名称和维护人员名称
+     * 
+     * @param maintenances 维护记录列表
+     */
+
     private void enrichMaintenances(List<Maintenance> maintenances) {
         if (maintenances == null || maintenances.isEmpty()) {
             return;
         }
 
         Map<Long, Facility> facilitiesById = facilityRepository.findAllById(
-                        maintenances.stream()
-                                .map(Maintenance::getFacilityId)
-                                .filter(Objects::nonNull)
-                                .collect(Collectors.toSet()))
+                maintenances.stream()
+                        .map(Maintenance::getFacilityId)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet()))
                 .stream()
                 .collect(Collectors.toMap(Facility::getId, facility -> facility));
 
         Map<Long, User> maintainersById = userRepository.findAllById(
-                        maintenances.stream()
-                                .map(Maintenance::getMaintainerId)
-                                .filter(Objects::nonNull)
-                                .collect(Collectors.toSet()))
+                maintenances.stream()
+                        .map(Maintenance::getMaintainerId)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet()))
                 .stream()
                 .collect(Collectors.toMap(User::getId, user -> user));
 
@@ -528,12 +658,22 @@ public class MaintenanceController {
         }
     }
 
+    /**
+     * 填充单条维护记录的设施名称和维护人员名称
+     * 
+     * @param maintenance 维护记录
+     */
     private void enrichMaintenance(Maintenance maintenance) {
         Optional<Facility> facilityOpt = facilityRepository.findById(maintenance.getFacilityId());
         facilityOpt.ifPresent(facility -> maintenance.setFacilityName(facility.getName()));
         fillMaintainerName(maintenance);
     }
 
+    /**
+     * 填充单条维护记录的维护人员名称
+     * 
+     * @param maintenance 维护记录
+     */
     private void fillMaintainerName(Maintenance maintenance) {
         if (maintenance.getMaintainerId() == null) {
             return;
@@ -546,6 +686,12 @@ public class MaintenanceController {
         userOpt.ifPresent(user -> maintenance.setMaintainer(getDisplayName(user)));
     }
 
+    /**
+     * 填充单条维护记录的维护人员名称
+     * 
+     * @param maintenance     维护记录
+     * @param maintainersById 所有用户映射
+     */
     private void fillMaintainerName(Maintenance maintenance, Map<Long, User> maintainersById) {
         if (maintenance.getMaintainerId() == null) {
             return;
@@ -560,6 +706,12 @@ public class MaintenanceController {
         }
     }
 
+    /**
+     * 获取用户显示名称
+     * 
+     * @param user 用户对象
+     * @return 显示名称（真实姓名或用户名）
+     */
     private String getDisplayName(User user) {
         if (user.getRealName() != null && !user.getRealName().isBlank()) {
             return user.getRealName();
@@ -567,6 +719,12 @@ public class MaintenanceController {
         return user.getUsername();
     }
 
+    /**
+     * 规范维护类型为大写
+     * 
+     * @param maintenanceType 维护类型字符串
+     * @return 规范后的维护类型（大写）
+     */
     private String normalizeMaintenanceType(String maintenanceType) {
         if (maintenanceType == null || maintenanceType.isBlank()) {
             return "OTHER";
@@ -580,6 +738,12 @@ public class MaintenanceController {
         };
     }
 
+    /**
+     * 根据时间范围获取开始时间
+     * 
+     * @param range 时间范围字符串（1d、7d、30d、180d、365d）
+     * @return 开始时间
+     */
     private LocalDateTime getStartTimeByRange(String range) {
         LocalDateTime now = LocalDateTime.now();
         return switch (range) {
@@ -592,6 +756,11 @@ public class MaintenanceController {
         };
     }
 
+    /**
+     * 检查设施是否需要恢复为可用状态
+     * 
+     * @param facilityId 设施ID
+     */
     private void restoreFacilityIfNeeded(Long facilityId) {
         if (facilityId == null) {
             return;
@@ -615,6 +784,12 @@ public class MaintenanceController {
         }
     }
 
+    /**
+     * 同步设施状态
+     * 
+     * @param maintenance 维护记录
+     * @param oldStatus   旧状态
+     */
     private void syncFacilityStatus(Maintenance maintenance, String oldStatus) {
         if (maintenance.getFacilityId() == null) {
             return;
@@ -648,6 +823,13 @@ public class MaintenanceController {
         }
     }
 
+    /**
+     * 检查维护记录是否占用了设施
+     * 
+     * @param maintenance 维护记录
+     * @param now         当前时间
+     * @return 是否占用了设施
+     */
     private boolean isMaintenanceOccupyingFacility(Maintenance maintenance, LocalDateTime now) {
         if (maintenance == null) {
             return false;

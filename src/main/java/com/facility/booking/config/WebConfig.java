@@ -14,6 +14,8 @@ public class WebConfig implements WebMvcConfigurer {
     @Value("${file.upload-dir:files}")
     private String uploadDir;
 
+    // 配置静态资源处理
+    // 允许前端直接访问上传的文件
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         Path uploadRoot = FileStoragePathUtils.resolveUploadRoot(uploadDir);

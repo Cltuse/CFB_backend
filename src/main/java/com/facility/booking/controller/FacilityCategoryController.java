@@ -28,6 +28,7 @@ public class FacilityCategoryController {
 
     /**
      * 获取所有设备类别
+     * 
      * @return 所有设备类别列表，按排序顺序升序排列
      */
     @GetMapping("/list")
@@ -38,6 +39,7 @@ public class FacilityCategoryController {
 
     /**
      * 获取启用的设备类别
+     * 
      * @return 启用状态的设备类别列表，按排序顺序升序排列
      */
     @GetMapping("/active")
@@ -48,6 +50,7 @@ public class FacilityCategoryController {
 
     /**
      * 根据ID获取设备类别
+     * 
      * @param id 设备类别ID
      * @return 设备类别详情
      */
@@ -62,6 +65,7 @@ public class FacilityCategoryController {
 
     /**
      * 创建设备类别
+     * 
      * @param category 设备类别信息
      * @return 创建的设备类别信息
      */
@@ -72,7 +76,6 @@ public class FacilityCategoryController {
         if (facilityCategoryRepository.existsByCategoryName(category.getCategoryName())) {
             return Result.error("类别名称已存在");
         }
-
 
         // 设置默认状态
         if (category.getStatus() == null || category.getStatus().isEmpty()) {
@@ -90,7 +93,8 @@ public class FacilityCategoryController {
 
     /**
      * 更新设备类别
-     * @param id 设备类别ID
+     * 
+     * @param id       设备类别ID
      * @param category 更新的设备类别信息
      * @return 更新后的设备类别信息
      */
@@ -105,7 +109,8 @@ public class FacilityCategoryController {
         FacilityCategory existingCategory = categoryOpt.get();
 
         // 检查类别名称是否已被其他记录使用
-        Optional<FacilityCategory> existingByName = facilityCategoryRepository.findByCategoryName(category.getCategoryName());
+        Optional<FacilityCategory> existingByName = facilityCategoryRepository
+                .findByCategoryName(category.getCategoryName());
         if (existingByName.isPresent() && !existingByName.get().getId().equals(id)) {
             return Result.error("类别名称已存在");
         }
@@ -122,6 +127,7 @@ public class FacilityCategoryController {
 
     /**
      * 删除设备类别
+     * 
      * @param id 设备类别ID
      * @return 删除结果
      */
@@ -137,6 +143,7 @@ public class FacilityCategoryController {
 
     /**
      * 切换设备类别状态
+     * 
      * @param id 设备类别ID
      * @return 更新状态后的设备类别信息
      */
@@ -158,6 +165,9 @@ public class FacilityCategoryController {
 
     /**
      * 搜索设备类别（模糊查询）
+     * 
+     * @param keyword 搜索关键词
+     * @return 符合条件的设备类别列表
      */
     @GetMapping("/search")
     public Result<List<FacilityCategory>> search(@RequestParam String keyword) {
@@ -167,12 +177,16 @@ public class FacilityCategoryController {
         }
 
         String trimmedKeyword = keyword.trim();
-        List<FacilityCategory> categories = facilityCategoryRepository.findByKeywordContainingIgnoreCaseOrderBySortOrderAsc(trimmedKeyword);
+        List<FacilityCategory> categories = facilityCategoryRepository
+                .findByKeywordContainingIgnoreCaseOrderBySortOrderAsc(trimmedKeyword);
         return Result.success(categories);
     }
 
     /**
      * 根据类别名称搜索
+     * 
+     * @param keyword 搜索关键词
+     * @return 符合条件的设备类别列表
      */
     @GetMapping("/search/name")
     public Result<List<FacilityCategory>> searchByName(@RequestParam String keyword) {
@@ -182,12 +196,19 @@ public class FacilityCategoryController {
         }
 
         String trimmedKeyword = keyword.trim();
-        List<FacilityCategory> categories = facilityCategoryRepository.findByCategoryNameContainingIgnoreCaseOrderBySortOrderAsc(trimmedKeyword);
+        List<FacilityCategory> categories = facilityCategoryRepository
+                .findByCategoryNameContainingIgnoreCaseOrderBySortOrderAsc(trimmedKeyword);
         return Result.success(categories);
     }
 
     /**
      * 分页查询所有类别
+     * 
+     * @param page    页码（默认0）
+     * @param size    每页数量（默认10）
+     * @param sortBy  排序字段（默认sortOrder）
+     * @param sortDir 排序方向（默认asc）
+     * @return 分页结果
      */
     @GetMapping("/page")
     public Result<Page<FacilityCategory>> listPage(
@@ -204,6 +225,13 @@ public class FacilityCategoryController {
 
     /**
      * 分页搜索设备类别（模糊查询）
+     * 
+     * @param keyword 搜索关键词
+     * @param page    页码（默认0）
+     * @param size    每页数量（默认10）
+     * @param sortBy  排序字段（默认sortOrder）
+     * @param sortDir 排序方向（默认asc）
+     * @return 分页结果
      */
     @GetMapping("/search/page")
     public Result<Page<FacilityCategory>> searchPage(
@@ -223,12 +251,20 @@ public class FacilityCategoryController {
         String trimmedKeyword = keyword.trim();
         Sort.Direction direction = "desc".equalsIgnoreCase(sortDir) ? Sort.Direction.DESC : Sort.Direction.ASC;
         Pageable pageable = PageUtils.of(page, size, Sort.by(direction, sortBy));
-        Page<FacilityCategory> categoryPage = facilityCategoryRepository.findByKeywordContainingIgnoreCaseOrderBySortOrderAsc(trimmedKeyword, pageable);
+        Page<FacilityCategory> categoryPage = facilityCategoryRepository
+                .findByKeywordContainingIgnoreCaseOrderBySortOrderAsc(trimmedKeyword, pageable);
         return Result.success(categoryPage);
     }
 
     /**
      * 分页根据类别名称搜索
+     * 
+     * @param keyword 搜索关键词
+     * @param page    页码（默认0）
+     * @param size    每页数量（默认10）
+     * @param sortBy  排序字段（默认sortOrder）
+     * @param sortDir 排序方向（默认asc）
+     * @return 分页结果
      */
     @GetMapping("/search/name/page")
     public Result<Page<FacilityCategory>> searchByNamePage(
@@ -248,12 +284,20 @@ public class FacilityCategoryController {
         String trimmedKeyword = keyword.trim();
         Sort.Direction direction = "desc".equalsIgnoreCase(sortDir) ? Sort.Direction.DESC : Sort.Direction.ASC;
         Pageable pageable = PageUtils.of(page, size, Sort.by(direction, sortBy));
-        Page<FacilityCategory> categoryPage = facilityCategoryRepository.findByCategoryNameContainingIgnoreCaseOrderBySortOrderAsc(trimmedKeyword, pageable);
+        Page<FacilityCategory> categoryPage = facilityCategoryRepository
+                .findByCategoryNameContainingIgnoreCaseOrderBySortOrderAsc(trimmedKeyword, pageable);
         return Result.success(categoryPage);
     }
 
     /**
      * 分页根据状态查询
+     * 
+     * @param status  状态（active/inactive）
+     * @param page    页码（默认0）
+     * @param size    每页数量（默认10）
+     * @param sortBy  排序字段（默认sortOrder）
+     * @param sortDir 排序方向（默认asc）
+     * @return 分页结果
      */
     @GetMapping("/status/page")
     public Result<Page<FacilityCategory>> listByStatusPage(
@@ -265,7 +309,8 @@ public class FacilityCategoryController {
 
         Sort.Direction direction = "desc".equalsIgnoreCase(sortDir) ? Sort.Direction.DESC : Sort.Direction.ASC;
         Pageable pageable = PageUtils.of(page, size, Sort.by(direction, sortBy));
-        Page<FacilityCategory> categoryPage = facilityCategoryRepository.findByStatusOrderBySortOrderAsc(status, pageable);
+        Page<FacilityCategory> categoryPage = facilityCategoryRepository.findByStatusOrderBySortOrderAsc(status,
+                pageable);
         return Result.success(categoryPage);
     }
 }

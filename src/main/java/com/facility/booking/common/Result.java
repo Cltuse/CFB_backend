@@ -8,6 +8,7 @@ public class Result<T> {
     private String message;
     private T data;
 
+    // 成功响应
     public static <T> Result<T> success(T data) {
         Result<T> result = new Result<>();
         result.setCode(200);
@@ -16,6 +17,7 @@ public class Result<T> {
         return result;
     }
 
+    // 成功响应（自定义消息）
     public static <T> Result<T> success(String message, T data) {
         Result<T> result = new Result<>();
         result.setCode(200);
@@ -24,6 +26,7 @@ public class Result<T> {
         return result;
     }
 
+    // 错误响应
     public static <T> Result<T> error(String message) {
         Result<T> result = new Result<>();
         result.setCode(500);
@@ -31,6 +34,7 @@ public class Result<T> {
         return result;
     }
 
+    // 错误响应（自定义code）
     public static <T> Result<T> error(Integer code, String message) {
         Result<T> result = new Result<>();
         result.setCode(code);
@@ -40,6 +44,7 @@ public class Result<T> {
 
     /**
      * 判断操作是否成功
+     * 
      * @return 是否成功（code为200表示成功）
      */
     public boolean isSuccess() {

@@ -11,12 +11,18 @@ import java.sql.SQLException;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    /**
+     * 全局异常处理
+     * 
+     * @param ex 异常对象
+     * @return 包含错误信息的响应
+     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Result<Object>> handleAllExceptions(Exception ex) {
         System.err.println("Global Exception Handler caught exception: " + ex.getClass().getSimpleName());
         System.err.println("Error message: " + ex.getMessage());
         ex.printStackTrace();
-        
+
         // 根据不同的异常类型返回不同的错误信息
         if (ex instanceof SQLException) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

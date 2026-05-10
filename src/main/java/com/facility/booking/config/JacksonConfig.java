@@ -22,11 +22,12 @@ public class JacksonConfig {
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final DateTimeFormatter ISO_DATE_TIME_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
+    // 配置Jackson，支持自定义日期格式化
     @Bean
     public ObjectMapper objectMapper() {
         JavaTimeModule javaTimeModule = new JavaTimeModule();
-        
-        // Custom deserializer that can handle multiple formats
+
+        // 通用的日期反序列化器，支持ISO格式和自定义格式
         javaTimeModule.addDeserializer(LocalDateTime.class, new JsonDeserializer<LocalDateTime>() {
             @Override
             public LocalDateTime deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
@@ -34,14 +35,14 @@ public class JacksonConfig {
                 if (dateStr == null || dateStr.trim().isEmpty()) {
                     return null;
                 }
-                
+
                 try {
                     // Try ISO format first (with or without Z)
                     if (dateStr.contains("T")) {
                         String cleanedDate = dateStr.replace("Z", "");
                         return LocalDateTime.parse(cleanedDate, ISO_DATE_TIME_FORMATTER);
                     }
-                    
+
                     // Try standard format
                     return LocalDateTime.parse(dateStr, DATE_TIME_FORMATTER);
                 } catch (DateTimeParseException e) {
@@ -50,7 +51,7 @@ public class JacksonConfig {
                 }
             }
         });
-        
+
         javaTimeModule.addSerializer(LocalDateTime.class, new LocalDateTimeSerializer(DATE_TIME_FORMATTER));
 
         return Jackson2ObjectMapperBuilder.json()
